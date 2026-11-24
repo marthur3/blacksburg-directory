@@ -1,4 +1,8 @@
-"""Maps Overture category text to directory groups. First match wins.
+"""Maps Overture places to directory groups.
+
+Order of trust: KIND_GROUP (exact category), keyword rules on the category, keyword rules on
+the taxonomy text, then the listing name. Names come last because they mislead: "Bed Bath &
+Beyond" is not lodging.
 
 A keyword ending in * matches any token with that prefix; others match a whole token.
 """
@@ -70,4 +74,55 @@ def assign_group(text: str) -> str:
                     return group
             elif w in tokens:
                 return group
+    return "Other"
+
+
+# Exact categories the keyword rules get wrong or cannot place.
+KIND_GROUP = {
+    "home service": "Home & Trades",
+    "campus building": "Education",
+    "research institute": "Education",
+    "place of learning": "Education",
+    "casual eatery": "Food & Drink",
+    "non alcoholic beverage venue": "Food & Drink",
+    "diagnostics imaging or lab service": "Health & Medical",
+    "complementary and alternative medicine": "Health & Medical",
+    "surgery": "Health & Medical",
+    "reproductive perinatal and womens care": "Health & Medical",
+    "senior living facility": "Health & Medical",
+    "outpatient care facility": "Health & Medical",
+    "emergency department": "Health & Medical",
+    "wellness service": "Beauty & Personal Care",
+    "technical service": "Professional Services",
+    "media service": "Professional Services",
+    "b2b service": "Professional Services",
+    "b2b science and technology service": "Professional Services",
+    "environmental or ecological service": "Professional Services",
+    "travel service": "Professional Services",
+    "apartment": "Professional Services",
+    "condominium": "Professional Services",
+    "family service": "Community & Civic",
+    "food bank": "Community & Civic",
+    "courthouse": "Community & Civic",
+    "military site": "Community & Civic",
+    "jail or prison": "Community & Civic",
+    "electric utility provider": "Community & Civic",
+    "water utility provider": "Community & Civic",
+    "garden": "Fitness & Recreation",
+    "nature reserve": "Fitness & Recreation",
+    "rv park": "Lodging",
+    "books music and video store": "Shopping",
+    "arts crafts and hobby store": "Shopping",
+    "sporting goods store": "Shopping",
+}
+
+
+def group_for(category: str, taxonomy_text: str = "", name: str = "") -> str:
+    kind = (category or "").replace("_", " ").strip().lower()
+    if kind in KIND_GROUP:
+        return KIND_GROUP[kind]
+    for text in (kind, taxonomy_text, name):
+        group = assign_group(text)
+        if group != "Other":
+            return group
     return "Other"

@@ -20,7 +20,7 @@ import urllib.request
 import duckdb
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from groups import GROUPS, assign_group  # noqa: E402
+from groups import GROUPS, group_for  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CONFIG = json.loads((ROOT / "config.json").read_text())
@@ -92,7 +92,7 @@ def normalize_town(town: str) -> str:
 
 
 # Landmarks Overture files under places; a business directory has no use for them.
-NOT_BUSINESSES = {"mountain", "river", "bridge", "geographic entities", "hot springs"}
+NOT_BUSINESSES = {"mountain", "river", "bridge", "geographic entities", "hot springs", "atm"}
 
 
 def pull(source: str) -> list[dict]:
@@ -132,7 +132,7 @@ def to_record(row: dict) -> dict | None:
         return None
     taxonomy = row.get("taxonomy") if isinstance(row.get("taxonomy"), dict) else {}
     tax_primary = (taxonomy or {}).get("primary") or ""
-    cat_text = " ".join([name, basic, flatten(row.get("taxonomy")), flatten(row.get("categories"))])
+    tax_text = " ".join([flatten(row.get("taxonomy")), flatten(row.get("categories"))])
     category = basic or tax_primary or (row.get("categories") or {}).get("primary") or ""
     addr = first(row.get("addresses")) or {}
     street = addr.get("freeform") or ""
@@ -140,7 +140,7 @@ def to_record(row: dict) -> dict | None:
     return {
         "id": row["id"],
         "name": name.strip(),
-        "group": assign_group(cat_text),
+        "group": group_for(str(category), tax_text, name),
         "category": str(category).replace("_", " "),
         "address": street,
         "town": town,
@@ -151,48 +151,101 @@ def to_record(row: dict) -> dict | None:
         "social": first(row.get("socials")) or "",
         "google_place_id": "",
         "notes": "",
+        "flag": "",
+        "conf": round(row.get("confidence") or 0, 2),
         "source": "overture",
     }
 
 
-def apply_overrides(records: dict[str, dict]) -> None:
-    """overrides.csv always wins over the feed. action: add | edit | hide."""
+def read_overrides() -> list[tuple[int, str, str, dict]]:
+    """Returns (line, action, id, fields). A field value of "-" clears that field."""
     if not OVERRIDES.exists():
-        return
+        return []
+    rows = []
     with OVERRIDES.open(newline="", encoding="utf-8") as f:
         for i, row in enumerate(csv.DictReader(f), start=2):
             action = (row.get("action") or "").strip().lower()
-            rid = (row.get("id") or "").strip()
             if not action or action.startswith("#"):
                 continue
-            fields = {k: v.strip() for k, v in row.items()
-                      if k not in ("action", "id") and v and v.strip()}
+            fields = {k: ("" if v.strip() == "-" else v.strip()) for k, v in row.items()
+                      if k and k not in ("action", "id") and v and v.strip()}
             for k in ("lat", "lng"):
-                if k in fields:
+                if fields.get(k):
                     fields[k] = float(fields[k])
-            if action == "hide":
-                records.pop(rid, None)
-            elif action == "edit":
-                if rid in records:
-                    records[rid].update(fields)
+            rows.append((i, action, (row.get("id") or "").strip(), fields))
+    return rows
+
+
+def apply_overrides(records: dict[str, dict]) -> tuple[list[dict], list[dict]]:
+    """overrides.csv always wins over the feed. Returns (hidden listings, kind rules).
+
+    Listing actions: add | edit | hide. Kind rules: rule-group | rule-hide, keyed on the
+    category column, apply to every listing of that kind. A listing row beats a kind rule.
+    """
+    rows = read_overrides()
+    feed_group = {rid: r["group"] for rid, r in records.items()}
+    hidden: dict[str, dict] = {}
+    rules: list[dict] = []
+
+    for i, action, _, fields in rows:
+        if action not in ("rule-group", "rule-hide"):
+            continue
+        kind = (fields.get("category") or "").lower()
+        if not kind:
+            print(f"overrides.csv line {i}: {action} needs a category", file=sys.stderr)
+            continue
+        matches = [rid for rid, r in records.items() if r["category"].lower() == kind]
+        if action == "rule-group":
+            if fields.get("group") not in GROUPS:
+                print(f"overrides.csv line {i}: unknown group {fields.get('group')!r}", file=sys.stderr)
+                continue
+            for rid in matches:
+                records[rid]["group"] = fields["group"]
+            rules.append({"kind": kind, "group": fields["group"]})
+        else:
+            for rid in matches:
+                hidden[rid] = {**records.pop(rid), "hidden_by": "kind", "hidden_reason": fields.get("notes", "")}
+            rules.append({"kind": kind, "hide": True})
+
+    for i, action, rid, fields in rows:
+        if action in ("rule-group", "rule-hide"):
+            continue
+        if action == "hide":
+            rec = records.pop(rid, None) or hidden.get(rid)
+            if rec:
+                hidden[rid] = {**rec, "hidden_by": "listing", "hidden_reason": fields.get("notes", "")}
+        elif action == "edit":
+            if rid in hidden and hidden[rid]["hidden_by"] == "kind":
+                rec = hidden.pop(rid)
+                rec.pop("hidden_by"), rec.pop("hidden_reason")
+                records[rid] = rec
+            if rid in records:
+                records[rid].update(fields)
+                if records[rid]["source"] == "overture":
                     records[rid]["source"] = "overture+edit"
-                else:
-                    print(f"overrides.csv line {i}: edit target {rid} not in feed", file=sys.stderr)
-            elif action == "add":
-                missing = [k for k in ("name", "lat", "lng") if k not in fields]
-                if missing:
-                    print(f"overrides.csv line {i}: add needs {missing}", file=sys.stderr)
-                    continue
-                rid = rid or "manual-" + re.sub(r"[^a-z0-9]+", "-", fields["name"].lower()).strip("-")
-                base = {"id": rid, "group": "Other", "category": "", "address": "", "town": "",
-                        "website": "", "phone": "", "social": "", "google_place_id": "",
-                        "notes": "", "source": "manual"}
-                base.update(fields)
-                if base["group"] not in GROUPS:
-                    print(f"overrides.csv line {i}: unknown group {base['group']!r}", file=sys.stderr)
-                records[rid] = base
             else:
-                print(f"overrides.csv line {i}: unknown action {action!r}", file=sys.stderr)
+                print(f"overrides.csv line {i}: edit target {rid} not in feed", file=sys.stderr)
+        elif action == "add":
+            missing = [k for k in ("name", "lat", "lng") if k not in fields]
+            if missing:
+                print(f"overrides.csv line {i}: add needs {missing}", file=sys.stderr)
+                continue
+            rid = rid or "manual-" + re.sub(r"[^a-z0-9]+", "-", fields["name"].lower()).strip("-")
+            base = {"id": rid, "group": "Other", "category": "", "address": "", "town": "",
+                    "website": "", "phone": "", "social": "", "google_place_id": "",
+                    "notes": "", "flag": "", "source": "manual"}
+            base.update(fields)
+            if base["group"] not in GROUPS:
+                print(f"overrides.csv line {i}: unknown group {base['group']!r}", file=sys.stderr)
+            records[rid] = base
+        else:
+            print(f"overrides.csv line {i}: unknown action {action!r}", file=sys.stderr)
+
+    # was_group records what the feed rules chose, so the page can spot patterns in corrections.
+    for rid, rec in list(records.items()) + list(hidden.items()):
+        if rid in feed_group and rec["group"] != feed_group[rid]:
+            rec["was_group"] = feed_group[rid]
+    return sorted(hidden.values(), key=lambda r: r["name"].lower()), rules
 
 
 def write_changes(old: dict[str, dict], new: dict[str, dict], release: str) -> None:
@@ -226,7 +279,7 @@ def main() -> None:
         rec = to_record(row)
         if rec:
             records[rec["id"]] = rec
-    apply_overrides(records)
+    hidden, rules = apply_overrides(records)
 
     old = {}
     if OUT.exists():
@@ -241,8 +294,11 @@ def main() -> None:
     OUT.write_text(json.dumps({
         "release": release,
         "updated": dt.date.today().isoformat(),
+        "built": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "groups": GROUPS,
         "businesses": businesses,
+        "hidden": hidden,
+        "rules": rules,
     }, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"Wrote {len(businesses)} businesses to {OUT.relative_to(ROOT)}")
 
