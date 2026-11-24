@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blacksburg Business Directory</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root { --ink:#1c2321; --muted:#667370; --line:#dfe5e2; --bg:#f6f8f7; --card:#fff; --accent:#8b1f41; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--bg);
+         display: grid; grid-template-columns: 400px 1fr; grid-template-rows: 100%; }
+  #panel { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; border-right: 1px solid var(--line); background: var(--card); }
+  header { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
+  h1 { font-size: 18px; margin: 0 0 10px; }
+  #q { width: 100%; padding: 9px 11px; font: inherit; border: 1px solid var(--line); border-radius: 8px; }
+  #q:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .row select { font: inherit; padding: 5px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; max-width: 50%; }
+  .row label { display: flex; gap: 5px; align-items: center; }
+  #chips { display: flex; gap: 6px; overflow-x: auto; padding: 10px 16px; border-bottom: 1px solid var(--line); scrollbar-width: thin; }
+  .chip { flex: none; display: flex; gap: 6px; align-items: center; font: inherit; font-size: 13px; padding: 5px 10px;
+          border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink); cursor: pointer; }
+  .chip[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .chip small { color: var(--muted); }
+  .chip[aria-pressed="true"] small { color: #cfd6d3; }
+  #count { padding: 8px 16px; font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+  #share { font: inherit; font-size: 13px; border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; }
+  #list { flex: 1; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+  #list li { padding: 10px 16px; border-top: 1px solid var(--line); cursor: pointer; }
+  #list li:hover, #list li.on { background: #f1f4f3; }
+  .name { font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+  .meta { font-size: 13px; color: var(--muted); }
+  .links { font-size: 13px; margin-top: 3px; display: flex; gap: 12px; flex-wrap: wrap; }
+  a { color: var(--accent); }
+  #more { margin: 12px 16px 20px; padding: 8px 12px; font: inherit; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; }
+  #empty { padding: 24px 16px; color: var(--muted); }
+  footer { padding: 8px 16px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); }
+  #map { min-height: 0; }
+  @media (max-width: 760px) {
+    body { grid-template-columns: 1fr; grid-template-rows: 42% 58%; }
+    #map { grid-row: 1; }
+    #panel { grid-row: 2; border-right: 0; border-top: 1px solid var(--line); }
+    h1 { display: none; }
+    header { padding-top: 10px; }
+  }
+</style>
+</head>
+<body>
+<section id="panel">
+  <header>
+    <h1 id="title">Blacksburg Business Directory</h1>
+    <input id="q" type="search" placeholder="Search name, category, street" aria-label="Search businesses">
+    <div class="row">
+      <select id="town" aria-label="Town"><option value="">All towns</option></select>
+      <label><input type="checkbox" id="inview"> Only what's on the map</label>
+    </div>
+  </header>
+  <div id="chips" role="group" aria-label="Category groups"></div>
+  <div id="count"><span id="n"></span><button id="share" type="button">Copy link to this view</button></div>
+  <ul id="list"></ul>
+  <footer id="foot"></footer>
+</section>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const COLORS = {
+  "Food & Drink":"#d1495b", "Shopping":"#edae49", "Health & Medical":"#00798c",
+  "Beauty & Personal Care":"#c05299", "Lodging":"#5f4bb6", "Auto":"#4a5759",
+  "Fitness & Recreation":"#3c9d5d", "Home & Trades":"#a0522d", "Professional Services":"#30638e",
+  "Education":"#7a9e1f", "Arts & Entertainment":"#e4572e", "Community & Civic":"#6d6875",
+  "Pets":"#b08900", "Other":"#9aa5a1"
+};
+const PAGE = 150;
+const $ = id => document.getElementById(id);
+const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+
+let all = [], shown = [], limit = PAGE, group = "", map, layer, markers = new Map(), activeId = null;
+
+async function load() {
+  const [cfg, data] = await Promise.all([
+    fetch("config.json").then(r => r.json()),
+    fetch("data/businesses.json", { cache: "no-cache" }).then(r => r.json())
+  ]);
+  document.title = $("title").textContent = cfg.title;
+  all = data.businesses.map(b => ({ ...b, hay: [b.name, b.category, b.group, b.address, b.town, b.notes].join(" ").toLowerCase() }));
+
+  map = L.map("map", { preferCanvas: true }).setView(cfg.center, cfg.zoom);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(map);
+  layer = L.layerGroup().addTo(map);
+  map.on("moveend", () => { if ($("inview").checked) render(); });
+
+  const towns = [...new Set(all.map(b => b.town).filter(Boolean))].sort();
+  $("town").insertAdjacentHTML("beforeend", towns.map(t => `<option>${esc(t)}</option>`).join(""));
+
+  $("foot").innerHTML = data.release === "none"
+    ? "No data yet. Run the Refresh workflow."
+    : `Places data: <a href="https://overturemaps.org">Overture Maps Foundation</a>, release ${esc(data.release)}, updated ${esc(data.updated)}, plus local edits.`;
+
+  group = groupFromHash(data.groups);
+  buildChips(data.groups);
+  ["input", "change"].forEach(e => { $("q").addEventListener(e, reset); $("town").addEventListener(e, reset); });
+  $("inview").addEventListener("change", reset);
+  window.addEventListener("hashchange", () => { group = groupFromHash(data.groups); syncChips(); reset(); });
+  $("share").addEventListener("click", copyLink);
+  render();
+}
+
+function groupFromHash(groups) {
+  const h = location.hash.slice(1);
+  return groups.find(g => slug(g) === h) || "";
+}
+
+function buildChips(groups) {
+  const counts = {};
+  all.forEach(b => counts[b.group] = (counts[b.group] || 0) + 1);
+  const chips = [`<button class="chip" data-g="">All <small>${all.length}</small></button>`]
+    .concat(groups.filter(g => counts[g]).map(g =>
+      `<button class="chip" data-g="${esc(g)}"><span class="dot" style="background:${COLORS[g] || COLORS.Other}"></span>${esc(g)} <small>${counts[g]}</small></button>`));
+  $("chips").innerHTML = chips.join("");
+  $("chips").addEventListener("click", e => {
+    const c = e.target.closest(".chip");
+    if (!c) return;
+    group = c.dataset.g;
+    history.replaceState(null, "", group ? "#" + slug(group) : location.pathname);
+    syncChips(); reset();
+  });
+  syncChips();
+}
+
+function syncChips() {
+  document.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", String(c.dataset.g === group)));
+}
+
+function reset() { limit = PAGE; render(); }
+
+function render() {
+  const terms = $("q").value.toLowerCase().split(/\s+/).filter(Boolean);
+  const town = $("town").value;
+  const bounds = $("inview").checked ? map.getBounds() : null;
+  shown = all.filter(b =>
+    (!group || b.group === group) &&
+    (!town || b.town === town) &&
+    terms.every(t => b.hay.includes(t)) &&
+    (!bounds || bounds.contains([b.lat, b.lng])));
+
+  $("n").textContent = `${shown.length.toLocaleString()} of ${all.length.toLocaleString()} businesses`;
+  const rows = shown.slice(0, limit).map(row).join("");
+  const more = shown.length > limit ? `<button id="more" type="button">Show ${Math.min(PAGE, shown.length - limit)} more</button>` : "";
+  $("list").innerHTML = shown.length ? rows + more : `<div id="empty">${all.length ? "Nothing matches these filters." : "No businesses loaded yet."}</div>`;
+  drawMarkers();
+}
+
+function row(b) {
+  const q = encodeURIComponent([b.name, b.address, b.town].filter(Boolean).join(", "));
+  const gmap = `https://www.google.com/maps/search/?api=1&query=${q}` + (b.google_place_id ? `&query_place_id=${encodeURIComponent(b.google_place_id)}` : "");
+  const site = /^https?:\/\//.test(b.website) ? `<a href="${esc(b.website)}" target="_blank" rel="noopener">Website</a>` : "";
+  const phone = b.phone ? `<span>${esc(b.phone)}</span>` : "";
+  return `<li data-id="${esc(b.id)}" class="${b.id === activeId ? "on" : ""}">
+    <div class="name"><span class="dot" style="background:${COLORS[b.group] || COLORS.Other}"></span>${esc(b.name)}</div>
+    <div class="meta">${esc([b.category || b.group, b.address, b.town].filter(Boolean).join(" · "))}</div>
+    ${b.notes ? `<div class="meta">${esc(b.notes)}</div>` : ""}
+    <div class="links">${site}${phone}<a href="${gmap}" target="_blank" rel="noopener">Open in Google Maps</a></div>
+  </li>`;
+}
+
+function drawMarkers() {
+  layer.clearLayers(); markers.clear();
+  shown.forEach(b => {
+    const m = L.circleMarker([b.lat, b.lng], {
+      radius: 6, weight: 1, color: "#fff", fillColor: COLORS[b.group] || COLORS.Other, fillOpacity: .9
+    }).bindTooltip(b.name).on("click", () => select(b.id, false));
+    markers.set(b.id, m); layer.addLayer(m);
+  });
+}
+
+function select(id, fly) {
+  activeId = id;
+  const i = shown.findIndex(b => b.id === id);
+  if (i >= limit) { limit = i + 1; render(); }
+  document.querySelectorAll("#list li").forEach(li => li.classList.toggle("on", li.dataset.id === id));
+  const m = markers.get(id);
+  if (m && fly) { map.setView(m.getLatLng(), Math.max(map.getZoom(), 17)); m.openTooltip(); }
+  if (!fly) document.querySelector(`#list li[data-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest" });
+}
+
+$("list").addEventListener("click", e => {
+  if (e.target.id === "more") { limit += PAGE; render(); return; }
+  if (e.target.closest("a")) return;
+  const li = e.target.closest("li");
+  if (li) select(li.dataset.id, true);
+});
+
+async function copyLink() {
+  try { await navigator.clipboard.writeText(location.href); $("share").textContent = "Link copied"; }
+  catch { $("share").textContent = location.href; }
+  setTimeout(() => $("share").textContent = "Copy link to this view", 2500);
+}
+
+load().catch(err => { $("list").innerHTML = `<div id="empty">Could not load the directory: ${esc(err.message)}</div>`; });
+</script>
+</body>
+</html>

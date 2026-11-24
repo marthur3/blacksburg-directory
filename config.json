@@ -1,0 +1,9 @@
+{
+  "title": "Blacksburg Business Directory",
+  "bbox": { "west": -80.50, "south": 37.10, "east": -80.34, "north": 37.29 },
+  "center": [37.2296, -80.4139],
+  "zoom": 13,
+  "min_confidence": 0.5,
+  "bucket": "s3://overturemaps-us-west-2/release",
+  "releases_url": "https://labs.overturemaps.org/data/releases.json"
+}
