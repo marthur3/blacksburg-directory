@@ -29,7 +29,11 @@ OVERRIDES = ROOT / "overrides.csv"
 
 def latest_release() -> str:
     """Overture's STAC catalog publishes `latest` (e.g. 2026-11-18.0)."""
-    with urllib.request.urlopen(CONFIG["releases_url"], timeout=30) as r:
+    req = urllib.request.Request(
+        CONFIG["releases_url"],
+        headers={"User-Agent": "blacksburg-directory/1.0"},
+    )
+    with urllib.request.urlopen(req, timeout=30) as r:
         payload = json.load(r)
     latest = payload.get("latest")
     if not latest:
