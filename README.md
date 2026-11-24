@@ -6,7 +6,7 @@ Map and filterable list of businesses in Blacksburg and Christiansburg. Static s
 
 | File | Purpose |
 |---|---|
-| `index.html` | Map, search, group chips, town filter, shareable links (`#food-drink`) |
+| `index.html` | Map, search, group chips, town filter, shareable links (`?g=food-drink`) |
 | `data/businesses.json` | Generated. Do not edit by hand |
 | `data/changes.md` | Generated. New and dropped businesses since the last refresh |
 | `overrides.csv` | Your edits. Always wins over the feed |
@@ -58,7 +58,7 @@ Ids come from `data/businesses.json`. Valid groups are listed in `scripts/groups
 ## Data and terms
 
 - Places come from the Overture Maps Foundation monthly release. Keep the footer attribution.
-- Map tiles come from OpenStreetMap's public tile server, which is meant for light traffic. Switch the tile URL in `index.html` if the directory gets busy.
+- Map tiles come from OpenFreeMap (Positron), falling back to OpenStreetMap's public raster tiles. Switch the tile URL in `index.html` if the directory gets busy.
 - Google data is never stored. Each listing links out to Google Maps, using `google_place_id` when you have filled one in.
 
 ## Status

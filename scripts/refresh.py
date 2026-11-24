@@ -13,6 +13,8 @@ import json
 import pathlib
 import re
 import sys
+import time
+import urllib.error
 import urllib.request
 
 import duckdb
@@ -33,8 +35,24 @@ def latest_release() -> str:
         CONFIG["releases_url"],
         headers={"User-Agent": "blacksburg-directory/1.0"},
     )
-    with urllib.request.urlopen(req, timeout=30) as r:
-        payload = json.load(r)
+    payload = None
+    for attempt in range(5):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                payload = json.load(r)
+            break
+        except urllib.error.HTTPError as e:
+            if e.code != 429 or attempt == 4:
+                raise
+            wait = 2 ** attempt
+            print(f"STAC catalog HTTP 429, retrying in {wait}s", file=sys.stderr)
+            time.sleep(wait)
+        except urllib.error.URLError as e:
+            if attempt == 4:
+                raise
+            wait = 2 ** attempt
+            print(f"STAC catalog {e.reason}, retrying in {wait}s", file=sys.stderr)
+            time.sleep(wait)
     latest = payload.get("latest")
     if not latest:
         raise SystemExit(f"No 'latest' release in {CONFIG['releases_url']}")

@@ -6,7 +6,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["overrides.csv", "config.json", "scripts/**"]
+    # Data inputs only. A scripts/** push after merge raced STAC (HTTP 429).
+    # Code changes can wait for the monthly run or a manual dispatch.
+    paths: ["overrides.csv", "config.json"]
 
 permissions:
   contents: write

@@ -54,6 +54,7 @@
   #opts { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-top: 10px; font-size: 13px; color: var(--lichen); }
   #opts select { padding: 3px 4px; border: 1px solid var(--stone); border-radius: 3px; background: var(--paper); color: var(--spruce); max-width: 150px; }
   #opts label { display: inline-flex; gap: 5px; align-items: center; }
+  #opts label[hidden] { display: none; }
 
   #status { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 9px 20px; font-size: 13px; color: var(--lichen); border-bottom: 1px solid var(--stone); }
   #status strong { color: var(--spruce); font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -247,8 +248,10 @@ function wire() {
 function sentinel() { let s = $("sentinel"); if (!s) { s = document.createElement("li"); s.id = "sentinel"; } return s; }
 
 function clearAll() {
-  Object.assign(state, { g: "", c: "", q: "", t: "", inview: false, newonly: false });
+  Object.assign(state, { g: "", c: "", q: "", t: "", inview: false, newonly: false, id: "" });
   $("q").value = ""; $("town").value = ""; $("inview").checked = false; $("newonly").checked = false;
+  popup?.remove();
+  map?.getSource("sel")?.setData({ type: "FeatureCollection", features: [] });
   reset();
 }
 function reset() { limit = PAGE; $("list").scrollTop = 0; render(); }

@@ -68,14 +68,40 @@ def test_overrides_add_and_hide(tmp_path=None):
         csv_path.unlink(missing_ok=True)
 
 
+def test_drop_landmarks():
+    row = {
+        "id": "mtn",
+        "names": {"primary": "Brush Mountain"},
+        "confidence": 1,
+        "operating_status": "open",
+        "basic_category": "mountain",
+        "taxonomy": {},
+        "categories": {},
+        "addresses": [{"freeform": "x", "locality": "Blacksburg"}],
+        "bbox": {"ymin": 37.2, "xmin": -80.4},
+        "websites": [],
+        "phones": [],
+        "socials": [],
+    }
+    assert to_record(row) is None
+    row["basic_category"] = "coffee_shop"
+    rec = to_record(row)
+    assert rec and rec["group"] == "Food & Drink"
+
+
 def test_latest_release_url():
     # Stay offline in CI. Two jobs hitting STAC at once got HTTP 429 on pull_request.
     assert CONFIG["releases_url"] == "https://stac.overturemaps.org/catalog.json"
     assert latest_release.__doc__
+    src = Path(latest_release.__code__.co_filename).read_text(encoding="utf-8")
+    start = src.index("def latest_release")
+    body = src[start:src.index("\ndef ", start + 1)]
+    assert "429" in body
+    assert "retrying" in body
 
 
 if __name__ == "__main__":
-    tests = [test_groups, test_fixture_pull, test_overrides_add_and_hide, test_latest_release_url]
+    tests = [test_groups, test_fixture_pull, test_overrides_add_and_hide, test_drop_landmarks, test_latest_release_url]
     for fn in tests:
         fn()
         print("ok", fn.__name__)
