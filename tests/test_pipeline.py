@@ -137,6 +137,32 @@ def test_kind_rules_flags_and_history():
         csv_path.unlink(missing_ok=True)
 
 
+def test_existing_overrides_still_hide():
+    """Real overrides.csv hide rows must still drop those listings."""
+    records = {
+        "6fc3b67c-e7f8-49be-9a65-e7969d1c4b2d": {
+            "id": "6fc3b67c-e7f8-49be-9a65-e7969d1c4b2d", "name": "Aerie",
+            "group": "Shopping", "category": "store", "source": "overture",
+        },
+        "126701a9-81ff-4167-80c6-c6f215a63758": {
+            "id": "126701a9-81ff-4167-80c6-c6f215a63758", "name": "Lin Yue Chuan",
+            "group": "Food & Drink", "category": "restaurant", "source": "overture",
+        },
+        "1aaf31cf-3a61-4c9f-b688-bf4416059bd3": {
+            "id": "1aaf31cf-3a61-4c9f-b688-bf4416059bd3", "name": "Owens dup",
+            "group": "Food & Drink", "category": "restaurant", "source": "overture",
+        },
+        "keep": {"id": "keep", "name": "Stay", "group": "Other", "category": "x", "source": "overture"},
+    }
+    hidden, _rules = apply_overrides(records)
+    assert "keep" in records
+    for rid in ("6fc3b67c-e7f8-49be-9a65-e7969d1c4b2d",
+                "126701a9-81ff-4167-80c6-c6f215a63758",
+                "1aaf31cf-3a61-4c9f-b688-bf4416059bd3"):
+        assert rid not in records
+        assert any(h["id"] == rid for h in hidden)
+
+
 def test_latest_release_url():
     # Stay offline in CI. Two jobs hitting STAC at once got HTTP 429 on pull_request.
     assert CONFIG["releases_url"] == "https://stac.overturemaps.org/catalog.json"
@@ -150,7 +176,7 @@ def test_latest_release_url():
 
 if __name__ == "__main__":
     tests = [test_groups, test_fixture_pull, test_overrides_add_and_hide, test_kind_rules_flags_and_history,
-             test_drop_landmarks, test_latest_release_url]
+             test_existing_overrides_still_hide, test_drop_landmarks, test_latest_release_url]
     for fn in tests:
         fn()
         print("ok", fn.__name__)

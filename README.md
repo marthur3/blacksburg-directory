@@ -78,11 +78,11 @@ Ids come from `data/businesses.json`. Valid groups are listed in `scripts/groups
 
 ## Owner edit mode
 
-Open the site with `?edit=1`, or use the "Owner edit" link in the footer. Visitors never load the editor.
+Open the site with `?edit=1` (not linked from the public page). Visitors who do not open that URL never load the editor, and even then they cannot write without their own GitHub token.
 
 - Open a listing to change its group or kind, add a note, toggle flags, or hide it with a reason.
 - Changes stage in the browser first. "Save to directory" writes them to `overrides.csv` as one commit, and the refresh workflow rebuilds the data.
-- Saving needs a fine-grained GitHub token for this repo only, with Contents set to read and write. The token is kept in the browser's local storage.
+- Saving needs a fine-grained GitHub token for this repo only, with Contents set to read and write. The token is kept in this browser's localStorage and sent only to `api.github.com` as an `Authorization` header (never in a URL, log, or git commit). Revoke it if you used a shared computer. Other GitHub Pages sites on the same `*.github.io` origin can read localStorage — do not store a token if you host untrusted Pages on this account.
 - After moving or hiding a listing, the bar offers the same action for every listing of that kind. Accepting adds a `rule-group` or `rule-hide` row.
 - "Patterns" lists kinds you have corrected twice or more, and checks whether low source confidence predicts the listings you hid as closed.
 - "Least certain first" sorts by Overture's confidence score, which puts likely-closed listings at the top.

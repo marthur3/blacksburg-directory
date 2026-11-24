@@ -225,7 +225,8 @@ function drawPatterns() {
 function drawAccount(msg) {
   const has = !!lsGet(LS.token);
   $("edpanel").innerHTML = `<h2>Saving needs a GitHub token</h2>
-    <p>${has ? "A token is stored in this browser." : `Create a fine-grained token for <b>${esc(cfg.repo)}</b> only, with “Contents” set to read and write, at <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a>. It stays in this browser and is sent only to GitHub.`}</p>
+    <p>${has ? "A token is stored in this browser. It is sent only to api.github.com as an Authorization header — never in a URL, log, or commit." : `Fine-grained token for <b>${esc(cfg.repo)}</b> only, Contents: Read and write. Create one at <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a> (90-day expiry is plenty). It stays in this browser.`}</p>
+    <p>Do not paste a token on a shared computer. Other Pages sites on this <code>*.github.io</code> origin can read localStorage.</p>
     <form id="tokform"><input name="token" type="password" placeholder="github_pat_…" autocomplete="off" aria-label="GitHub token">
       <button class="go">${has ? "Replace token" : "Store token"}</button></form>
     ${msg ? `<p class="msg">${msg}</p>` : ""}
@@ -247,13 +248,21 @@ function onPanelClick(e) {
 async function onTokenSubmit(e) {
   e.preventDefault();
   const token = new FormData(e.target).get("token").trim(); if (!token) return;
+  if (!/^(github_pat_|ghp_)/.test(token)) {
+    drawAccount("That does not look like a GitHub token (it should start with github_pat_ or ghp_). Nothing was stored.");
+    return;
+  }
   try { await gh(token, `/repos/${cfg.repo}/contents/overrides.csv?ref=${cfg.branch || "main"}`); lsSet(LS.token, token); drawAccount("Token works. You can save now."); }
   catch (err) { drawAccount(`GitHub rejected that token: ${esc(err.message)}`); }
 }
 
-/* Save: one commit to overrides.csv */
+/* Save: one commit to overrides.csv. Token is only sent here, as Authorization, to api.github.com. */
 async function gh(token, path, opts = {}) {
-  const r = await fetch(API + path, { ...opts, headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`, "X-GitHub-Api-Version": "2022-11-28" } });
+  const allowed = `/repos/${cfg.repo}/contents/overrides.csv`;
+  if (!path.startsWith(allowed)) throw new Error("unexpected GitHub path");
+  const url = API + path;
+  if (!url.startsWith(API + "/repos/")) throw new Error("unexpected GitHub URL");
+  const r = await fetch(url, { ...opts, headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${token}`, "X-GitHub-Api-Version": "2022-11-28" } });
   if (!r.ok) throw new Error(`${r.status} ${(await r.json().catch(() => ({}))).message || r.statusText}`);
   return r.json();
 }

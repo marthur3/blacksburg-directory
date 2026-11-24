@@ -15,3 +15,4 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt
       - run: python tests/test_pipeline.py
+      - run: node tests/test_edit_merge.js

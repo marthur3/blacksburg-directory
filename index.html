@@ -197,7 +197,7 @@ async function load() {
   $("sub").textContent = `${all.length.toLocaleString()} places in ${towns.join(" and ") || "town"}, sorted so you can browse them.`;
   $("newwrap").hidden = !all.some(b => b.isNew);
   $("foot").innerHTML = data.release === "none" ? "No listings loaded yet."
-    : `Listings from <a href="https://overturemaps.org" target="_blank" rel="noopener">Overture Maps Foundation</a> release ${esc(data.release)}, with local corrections. Updated ${esc(data.updated)}. <a href="?edit=1">Owner edit</a>`;
+    : `Listings from <a href="https://overturemaps.org" target="_blank" rel="noopener">Overture Maps Foundation</a> release ${esc(data.release)}, with local corrections. Updated ${esc(data.updated)}.`;
 
   readUrl();
   buildRail();
