@@ -66,3 +66,12 @@ Ids come from `data/businesses.json`. Valid groups are listed in `scripts/groups
 - Refresh reads the latest release from Overture's STAC catalog (`https://stac.overturemaps.org/catalog.json`).
 - Grouping rules keep the "Other" bucket under 15% of listings.
 - Offline tests cover the synthetic fixture in `tests/` (`python tests/test_pipeline.py`).
+
+## Page features
+
+- Group legend with live counts, plus the top kinds inside the chosen group (coffee shop, bar, brewery).
+- A to Z rail for jumping through the index, or sort by nearest to the map center.
+- Clustered vector map (MapLibre with the OpenFreeMap basemap, OpenStreetMap raster tiles as fallback).
+- Shareable links: `?g=food-drink&c=coffee-shop`, `?q=main+st`, `?id=<listing id>`. Add `&embed=1` to hide the title for iframes.
+- "New listings" appears once a refresh finds places the previous run did not have (`first_seen` in the data).
+- Set `"suggest_url"` in `config.json` to a form or email link to show "Suggest a correction" on every listing.
