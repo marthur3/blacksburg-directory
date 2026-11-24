@@ -19,7 +19,7 @@
   .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; font-size: 13px; color: var(--muted); }
   .row select { font: inherit; padding: 5px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; max-width: 50%; }
   .row label { display: flex; gap: 5px; align-items: center; }
-  #chips { display: flex; gap: 6px; overflow-x: auto; padding: 10px 16px; border-bottom: 1px solid var(--line); scrollbar-width: thin; }
+  #chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
   .chip { flex: none; display: flex; gap: 6px; align-items: center; font: inherit; font-size: 13px; padding: 5px 10px;
           border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink); cursor: pointer; }
   .chip[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
@@ -203,7 +203,12 @@ async function copyLink() {
   setTimeout(() => $("share").textContent = "Copy link to this view", 2500);
 }
 
-load().catch(err => { $("list").innerHTML = `<div id="empty">Could not load the directory: ${esc(err.message)}</div>`; });
+load().catch(err => {
+  const hint = location.protocol === "file:"
+    ? " Open this folder with <code>python -m http.server 8000</code> and visit http://localhost:8000 — opening the HTML file directly does not load the listings."
+    : " If the list is empty, run <code>python scripts/refresh.py</code> to pull places data.";
+  $("list").innerHTML = `<div id="empty">Could not load the directory: ${esc(err.message)}. ${hint}</div>`;
+});
 </script>
 </body>
 </html>

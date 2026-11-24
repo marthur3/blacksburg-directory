@@ -13,22 +13,39 @@ Map and filterable list of businesses in Blacksburg and Christiansburg. Static s
 | `scripts/refresh.py` | Pulls Overture Places for the bbox in `config.json`, applies overrides |
 | `scripts/groups.py` | Keyword rules that sort categories into groups |
 | `.github/workflows/refresh.yml` | Runs the refresh monthly, on demand, and when `overrides.csv` changes |
+| `.github/workflows/test.yml` | Offline fixture + grouping checks on every push |
 
-## Setup
+## Run locally
 
-1. Create the repo and push.
-   ```
-   gh repo create blacksburg-directory --public --source . --push
-   ```
-2. In the repo, set Settings > Actions > General > Workflow permissions to "Read and write".
-3. Set Settings > Pages to deploy from `main`, root folder.
-4. Run the "Refresh directory data" workflow once from the Actions tab.
+The page loads `data/businesses.json` with `fetch()`, so it has to be served over HTTP. Opening `index.html` as a file will not show listings.
 
-The site is then live at `https://<user>.github.io/blacksburg-directory/`. Cloudflare Pages also works with no build command.
+```
+python3 -m pip install -r requirements.txt
+python3 tests/test_pipeline.py          # optional, no S3
+python3 scripts/refresh.py              # pulls Overture Places, writes data/
+python3 -m http.server 8000
+```
+
+Then open http://localhost:8000. Search the list, click a category chip, or pick a town. Marker clicks scroll the matching row.
+
+`refresh.py` needs outbound HTTPS to `stac.overturemaps.org` and Amazon S3 (`s3://overturemaps-us-west-2`). A first pull for this bbox takes a few seconds.
+
+## Deploy (GitHub Pages)
+
+This is a static site: `index.html`, `config.json`, and `data/`. No build step.
+
+1. Push to GitHub (already done for this repo).
+2. Repo **Settings → Actions → General → Workflow permissions**: Read and write (so the monthly refresh can commit `data/`).
+3. Repo **Settings → Pages**: Deploy from **branch `main`**, folder **`/` (root)**. GitHub Pages is not on until you flip this switch; the site files are otherwise ready.
+4. The directory is then at `https://<user>.github.io/blacksburg-directory/`.
+
+Cloudflare Pages also works: no build command, output directory `/`.
+
+Until Pages is enabled, clone the repo and use the local commands above. The first GitHub Actions refresh failed because it still pointed at a retired Overture releases URL; that is fixed, and `data/businesses.json` is populated from the 2026-11-18.0 Places release.
 
 ## Editing
 
-Add rows to `overrides.csv`. Editing the file on github.com triggers a rebuild.
+Add rows to `overrides.csv`. Editing the file on github.com (on `main`) triggers a rebuild.
 
 | action | Needs | Effect |
 |---|---|---|
@@ -38,14 +55,6 @@ Add rows to `overrides.csv`. Editing the file on github.com triggers a rebuild.
 
 Ids come from `data/businesses.json`. Valid groups are listed in `scripts/groups.py`.
 
-## Local run
-
-```
-pip install duckdb
-python scripts/refresh.py
-python -m http.server 8000
-```
-
 ## Data and terms
 
 - Places come from the Overture Maps Foundation monthly release. Keep the footer attribution.
@@ -54,5 +63,6 @@ python -m http.server 8000
 
 ## Status
 
-- Tested: refresh logic, overrides, grouping, and the page UI against a synthetic fixture (`tests/`).
-- Not yet run: the live Overture pull. The build environment could not reach Overture's bucket, so the first workflow run is the first real test. `refresh.py` reads the release's column list before selecting, which covers schema changes between releases.
+- Refresh reads the latest release from Overture's STAC catalog (`https://stac.overturemaps.org/catalog.json`).
+- Grouping rules keep the "Other" bucket under 15% of listings.
+- Offline tests cover the synthetic fixture in `tests/` (`python tests/test_pipeline.py`).

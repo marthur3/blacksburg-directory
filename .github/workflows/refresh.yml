@@ -5,6 +5,7 @@ on:
     - cron: "0 9 25 * *"   # monthly, after Overture's usual release window
   workflow_dispatch:
   push:
+    branches: [main]
     paths: ["overrides.csv", "config.json", "scripts/**"]
 
 permissions:

@@ -28,8 +28,13 @@ OVERRIDES = ROOT / "overrides.csv"
 
 
 def latest_release() -> str:
+    """Overture's STAC catalog publishes `latest` (e.g. 2026-11-18.0)."""
     with urllib.request.urlopen(CONFIG["releases_url"], timeout=30) as r:
-        return json.load(r)["latest"]
+        payload = json.load(r)
+    latest = payload.get("latest")
+    if not latest:
+        raise SystemExit(f"No 'latest' release in {CONFIG['releases_url']}")
+    return latest
 
 
 def flatten(value) -> str:
@@ -49,6 +54,19 @@ def first(value):
     if isinstance(value, (list, tuple)) and value:
         return value[0]
     return None
+
+
+TOWN_FIX = {
+    "blacksburg": "Blacksburg",
+    "christiansburg": "Christiansburg",
+    "christianburg": "Christiansburg",
+    "christiansbrg": "Christiansburg",
+}
+
+
+def normalize_town(town: str) -> str:
+    town = (town or "").strip()
+    return TOWN_FIX.get(town.lower(), town)
 
 
 def pull(source: str) -> list[dict]:
@@ -84,16 +102,18 @@ def to_record(row: dict) -> dict | None:
         return None
 
     basic = row.get("basic_category") or ""
-    cat_text = " ".join([basic, flatten(row.get("taxonomy")), flatten(row.get("categories"))])
-    category = basic or (row.get("categories") or {}).get("primary") or ""
+    taxonomy = row.get("taxonomy") if isinstance(row.get("taxonomy"), dict) else {}
+    tax_primary = (taxonomy or {}).get("primary") or ""
+    cat_text = " ".join([name, basic, flatten(row.get("taxonomy")), flatten(row.get("categories"))])
+    category = basic or tax_primary or (row.get("categories") or {}).get("primary") or ""
     addr = first(row.get("addresses")) or {}
     street = addr.get("freeform") or ""
-    town = addr.get("locality") or ""
+    town = normalize_town(addr.get("locality") or "")
     return {
         "id": row["id"],
         "name": name.strip(),
         "group": assign_group(cat_text),
-        "category": category.replace("_", " "),
+        "category": str(category).replace("_", " "),
         "address": street,
         "town": town,
         "lat": round(row["bbox"]["ymin"], 6),

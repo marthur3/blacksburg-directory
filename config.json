@@ -5,5 +5,5 @@
   "zoom": 13,
   "min_confidence": 0.5,
   "bucket": "s3://overturemaps-us-west-2/release",
-  "releases_url": "https://labs.overturemaps.org/data/releases.json"
+  "releases_url": "https://stac.overturemaps.org/catalog.json"
 }
