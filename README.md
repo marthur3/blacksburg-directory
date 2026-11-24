@@ -6,7 +6,7 @@ Map and filterable list of businesses in Blacksburg and Christiansburg. Static s
 
 | File | Purpose |
 |---|---|
-| `index.html` | Map, search, group chips, town filter, shareable links (`#food-drink`) |
+| `index.html` | Map, search, group chips, town filter, shareable links (`?g=food-drink`) |
 | `data/businesses.json` | Generated. Do not edit by hand |
 | `data/changes.md` | Generated. New and dropped businesses since the last refresh |
 | `overrides.csv` | Your edits. Always wins over the feed |
@@ -58,7 +58,7 @@ Ids come from `data/businesses.json`. Valid groups are listed in `scripts/groups
 ## Data and terms
 
 - Places come from the Overture Maps Foundation monthly release. Keep the footer attribution.
-- Map tiles come from OpenStreetMap's public tile server, which is meant for light traffic. Switch the tile URL in `index.html` if the directory gets busy.
+- Map tiles come from OpenFreeMap (Positron), falling back to OpenStreetMap's public raster tiles. Switch the tile URL in `index.html` if the directory gets busy.
 - Google data is never stored. Each listing links out to Google Maps, using `google_place_id` when you have filled one in.
 
 ## Status
@@ -66,3 +66,12 @@ Ids come from `data/businesses.json`. Valid groups are listed in `scripts/groups
 - Refresh reads the latest release from Overture's STAC catalog (`https://stac.overturemaps.org/catalog.json`).
 - Grouping rules keep the "Other" bucket under 15% of listings.
 - Offline tests cover the synthetic fixture in `tests/` (`python tests/test_pipeline.py`).
+
+## Page features
+
+- Group legend with live counts, plus the top kinds inside the chosen group (coffee shop, bar, brewery).
+- A to Z rail for jumping through the index, or sort by nearest to the map center.
+- Clustered vector map (MapLibre with the OpenFreeMap basemap, OpenStreetMap raster tiles as fallback).
+- Shareable links: `?g=food-drink&c=coffee-shop`, `?q=main+st`, `?id=<listing id>`. Add `&embed=1` to hide the title for iframes.
+- "New listings" appears once a refresh finds places the previous run did not have (`first_seen` in the data).
+- Set `"suggest_url"` in `config.json` to a form or email link to show "Suggest a correction" on every listing.

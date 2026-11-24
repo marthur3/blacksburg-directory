@@ -4,210 +4,439 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Blacksburg Business Directory</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<meta name="description" content="Every business in Blacksburg and Christiansburg on one map, sorted into groups you can browse.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <style>
-  :root { --ink:#1c2321; --muted:#667370; --line:#dfe5e2; --bg:#f6f8f7; --card:#fff; --accent:#8b1f41; }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
-  body { font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--bg);
-         display: grid; grid-template-columns: 400px 1fr; grid-template-rows: 100%; }
-  #panel { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; border-right: 1px solid var(--line); background: var(--card); }
-  header { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
-  h1 { font-size: 18px; margin: 0 0 10px; }
-  #q { width: 100%; padding: 9px 11px; font: inherit; border: 1px solid var(--line); border-radius: 8px; }
-  #q:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; font-size: 13px; color: var(--muted); }
-  .row select { font: inherit; padding: 5px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; max-width: 50%; }
-  .row label { display: flex; gap: 5px; align-items: center; }
-  #chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
-  .chip { flex: none; display: flex; gap: 6px; align-items: center; font: inherit; font-size: 13px; padding: 5px 10px;
-          border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink); cursor: pointer; }
-  .chip[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
-  .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
-  .chip small { color: var(--muted); }
-  .chip[aria-pressed="true"] small { color: #cfd6d3; }
-  #count { padding: 8px 16px; font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
-  #share { font: inherit; font-size: 13px; border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; }
-  #list { flex: 1; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
-  #list li { padding: 10px 16px; border-top: 1px solid var(--line); cursor: pointer; }
-  #list li:hover, #list li.on { background: #f1f4f3; }
-  .name { font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
-  .meta { font-size: 13px; color: var(--muted); }
-  .links { font-size: 13px; margin-top: 3px; display: flex; gap: 12px; flex-wrap: wrap; }
-  a { color: var(--accent); }
-  #more { margin: 12px 16px 20px; padding: 8px 12px; font: inherit; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; }
-  #empty { padding: 24px 16px; color: var(--muted); }
-  footer { padding: 8px 16px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); }
-  #map { min-height: 0; }
-  @media (max-width: 760px) {
-    body { grid-template-columns: 1fr; grid-template-rows: 42% 58%; }
-    #map { grid-row: 1; }
-    #panel { grid-row: 2; border-right: 0; border-top: 1px solid var(--line); }
-    h1 { display: none; }
-    header { padding-top: 10px; }
+  :root {
+    --spruce: #14302b; --chalk: #f3f5f1; --paper: #ffffff; --stone: #cfd5cc; --lichen: #5d6f68; --maroon: #7a1f3d;
+    --panel: 430px;
   }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body { font: 400 15px/1.45 Archivo, system-ui, sans-serif; color: var(--spruce); background: var(--chalk);
+         display: grid; grid-template-columns: var(--panel) 1fr; grid-template-rows: 100%; overflow: hidden; }
+  button, input, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--maroon); outline-offset: 2px; }
+  a { color: var(--maroon); text-underline-offset: 2px; }
+
+  /* Index panel */
+  #panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; background: var(--paper); border-right: 1px solid var(--stone); }
+  #masthead { padding: 18px 20px 14px; background: var(--spruce); color: var(--chalk); }
+  h1 { margin: 0; font-size: 34px; line-height: .95; font-weight: 800; font-stretch: 68%; letter-spacing: -.005em; }
+  #sub { margin: 6px 0 12px; font-size: 13px; color: #b9c8c1; }
+  #q { width: 100%; padding: 10px 12px; border: 0; border-radius: 4px; background: var(--chalk); color: var(--spruce); }
+  #q::placeholder { color: var(--lichen); }
+
+  #filters { padding: 12px 20px 10px; border-bottom: 1px solid var(--stone); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 8px; font-size: 13px; line-height: 1.3;
+          border: 1px solid var(--stone); border-radius: 3px; background: var(--paper); cursor: pointer; }
+  .chip:hover { border-color: var(--lichen); }
+  .chip[aria-pressed="true"] { background: var(--spruce); border-color: var(--spruce); color: var(--chalk); }
+  .chip .n { font-size: 12px; color: var(--lichen); font-variant-numeric: tabular-nums; }
+  .chip[aria-pressed="true"] .n { color: #b9c8c1; }
+  .sw { width: 10px; height: 10px; border-radius: 50%; flex: none; box-shadow: 0 0 0 1.5px #fff; }
+  /* Groups read as a map legend: two columns, count on the right. */
+  #groups { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+  #groups .chip { border: 0; border-radius: 2px; padding: 3px 6px; justify-content: flex-start; text-align: left; }
+  #groups .chip .n { margin-left: auto; }
+  #groups .chip:hover { background: var(--chalk); }
+  #groups .chip[aria-pressed="true"]:hover { background: var(--spruce); }
+  #cats { margin-top: 8px; padding: 8px 0 2px; border-top: 1px dashed var(--stone); flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+  #cats .chip { flex: none; }
+  #cats:empty { display: none; }
+  #cats .chip { border-style: dashed; padding-left: 10px; }
+  #cats .chip[aria-pressed="true"] { border-style: solid; background: var(--maroon); border-color: var(--maroon); }
+  #cats .chip[aria-pressed="true"] .n { color: #e6c3cf; }
+  #opts { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-top: 10px; font-size: 13px; color: var(--lichen); }
+  #opts select { padding: 3px 4px; border: 1px solid var(--stone); border-radius: 3px; background: var(--paper); color: var(--spruce); max-width: 150px; }
+  #opts label { display: inline-flex; gap: 5px; align-items: center; }
+  #opts label[hidden] { display: none; }
+
+  #status { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 9px 20px; font-size: 13px; color: var(--lichen); border-bottom: 1px solid var(--stone); }
+  #status strong { color: var(--spruce); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .textbtn { border: 0; background: none; padding: 0; color: var(--maroon); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+
+  #body { flex: 1; min-height: 0; overflow: hidden; display: grid; grid-template-columns: 1fr 22px; grid-template-rows: minmax(0, 1fr); }
+  #list { overflow-y: auto; margin: 0; padding: 0; list-style: none; position: relative; }
+  #list li.biz { display: grid; grid-template-columns: 14px 1fr; column-gap: 10px; padding: 10px 12px 10px 20px; border-bottom: 1px solid #e6eae4; cursor: pointer; }
+  #list li.biz:hover { background: var(--chalk); }
+  #list li.biz.on { background: var(--chalk); box-shadow: inset 4px 0 0 var(--maroon); cursor: default; }
+  li.biz .sw { margin-top: 7px; }
+  .nm { font-size: 18px; line-height: 1.15; font-weight: 700; font-stretch: 78%; }
+  .new { margin-left: 6px; padding: 0 5px; font-size: 11px; font-weight: 700; font-stretch: 100%; color: var(--paper); background: var(--maroon); border-radius: 2px; vertical-align: 2px; }
+  .ct { font-size: 13px; color: var(--lichen); }
+  .ct::first-letter { text-transform: uppercase; }
+  .more { display: none; margin-top: 8px; font-size: 14px; }
+  li.on .more { display: block; }
+  .more p { margin: 0 0 4px; }
+  .acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .acts a, .acts button { padding: 5px 10px; font-size: 13px; text-decoration: none; border: 1px solid var(--spruce); border-radius: 3px; background: var(--paper); color: var(--spruce); cursor: pointer; }
+  .acts a.primary { background: var(--spruce); color: var(--chalk); }
+  li.letter { position: sticky; top: 0; z-index: 1; padding: 2px 20px; font-size: 13px; font-weight: 800; background: var(--stone); color: var(--spruce); }
+  #sentinel { height: 1px; }
+  #empty { padding: 28px 20px; color: var(--lichen); }
+  #empty button { margin-top: 10px; }
+
+  /* A–Z rail, as on the index of a folded street map */
+  #rail { display: flex; flex-direction: column; justify-content: space-between; padding: 4px 0; background: var(--chalk); border-left: 1px solid var(--stone); }
+  #rail button { flex: 1; min-height: 0; border: 0; background: none; padding: 0; font-size: 11px; font-weight: 700; line-height: 1; color: var(--spruce); cursor: pointer; }
+  #rail button:disabled { color: var(--stone); cursor: default; }
+  #rail button:not(:disabled):hover { background: var(--spruce); color: var(--chalk); }
+  #rail.off { visibility: hidden; }
+
+  footer { padding: 7px 20px; font-size: 11px; color: var(--lichen); border-top: 1px solid var(--stone); }
+
+  /* Map */
+  #mapwrap { position: relative; min-width: 0; min-height: 0; }
+  #map { position: absolute; inset: 0; background: #e4e9e2; }
+  .maplibregl-popup-content { padding: 9px 12px; border-radius: 3px; font: 400 13px/1.35 Archivo, sans-serif; color: var(--spruce); }
+  .maplibregl-popup-content b { display: block; font-size: 16px; font-weight: 700; font-stretch: 78%; }
+  #toggle { display: none; }
+
+  body.embed #masthead h1, body.embed #sub, body.embed footer { display: none; }
+  body.embed #masthead { padding: 10px 20px; }
+
+  @media (max-width: 820px) {
+    body { grid-template-columns: 1fr; grid-template-rows: 44% 56%; transition: grid-template-rows .25s ease; }
+    body.listfull { grid-template-rows: 0% 100%; }
+    body.mapfull { grid-template-rows: calc(100% - 118px) 118px; }
+    #mapwrap { grid-row: 1; }
+    #panel { grid-row: 2; border-right: 0; border-top: 1px solid var(--stone); }
+    #masthead { padding: 10px 14px; display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+    h1, #sub { display: none; }
+    #filters { padding: 10px 14px 8px; }
+    #groups { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -14px; padding: 0 14px; }
+    #groups .chip { flex: none; border: 1px solid var(--stone); border-radius: 3px; padding: 4px 10px 4px 8px; }
+    #groups .chip .n { margin-left: 0; }
+    #cats { scrollbar-width: none; }
+    #status { padding: 8px 14px; }
+    #list li.biz { padding-left: 14px; }
+    li.letter { padding-left: 14px; }
+    #toggle { display: block; padding: 9px 12px; border: 1px solid #5c746c; border-radius: 4px; background: none; color: var(--chalk); font-size: 13px; white-space: nowrap; }
+    footer { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { body { transition: none; } }
 </style>
 </head>
 <body>
-<section id="panel">
-  <header>
+<section id="panel" aria-label="Business index">
+  <div id="masthead">
     <h1 id="title">Blacksburg Business Directory</h1>
-    <input id="q" type="search" placeholder="Search name, category, street" aria-label="Search businesses">
-    <div class="row">
-      <select id="town" aria-label="Town"><option value="">All towns</option></select>
+    <p id="sub"></p>
+    <input id="q" type="search" placeholder="Search name, street, or kind of place" aria-label="Search businesses">
+    <button id="toggle" type="button">Bigger list</button>
+  </div>
+  <div id="filters">
+    <div id="groups" class="chips" role="group" aria-label="Groups"></div>
+    <div id="cats" class="chips" role="group" aria-label="Kinds within this group"></div>
+    <div id="opts">
+      <select id="town" aria-label="Town"><option value="">Both towns</option></select>
+      <select id="sort" aria-label="Sort"><option value="name">A to Z</option><option value="near">Nearest map center</option></select>
       <label><input type="checkbox" id="inview"> Only what's on the map</label>
+      <label id="newwrap" hidden><input type="checkbox" id="newonly"> New listings</label>
     </div>
-  </header>
-  <div id="chips" role="group" aria-label="Category groups"></div>
-  <div id="count"><span id="n"></span><button id="share" type="button">Copy link to this view</button></div>
-  <ul id="list"></ul>
+  </div>
+  <div id="status"><span id="n"></span><span><button id="clear" class="textbtn" type="button" hidden>Clear filters</button> <button id="share" class="textbtn" type="button">Copy link to this view</button></span></div>
+  <div id="body">
+    <ul id="list"></ul>
+    <nav id="rail" aria-label="Jump to letter"></nav>
+  </div>
   <footer id="foot"></footer>
 </section>
-<div id="map"></div>
+<div id="mapwrap"><div id="map"></div></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 const COLORS = {
-  "Food & Drink":"#d1495b", "Shopping":"#edae49", "Health & Medical":"#00798c",
-  "Beauty & Personal Care":"#c05299", "Lodging":"#5f4bb6", "Auto":"#4a5759",
-  "Fitness & Recreation":"#3c9d5d", "Home & Trades":"#a0522d", "Professional Services":"#30638e",
-  "Education":"#7a9e1f", "Arts & Entertainment":"#e4572e", "Community & Civic":"#6d6875",
-  "Pets":"#b08900", "Other":"#9aa5a1"
+  "Food & Drink":"#d9432f", "Shopping":"#e39a12", "Health & Medical":"#0f8a96", "Beauty & Personal Care":"#c2479a",
+  "Lodging":"#5b47b8", "Auto":"#47545a", "Fitness & Recreation":"#2f9a52", "Home & Trades":"#9a5a2b",
+  "Professional Services":"#2c63a3", "Education":"#7d9a14", "Arts & Entertainment":"#e0662b",
+  "Community & Civic":"#756a80", "Pets":"#a98500", "Other":"#93a09a"
 };
-const PAGE = 150;
+const PAGE = 80, NEW_DAYS = 45, LETTERS = "#ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+const BASEMAP = "https://tiles.openfreemap.org/styles/positron";
+const RASTER = { version: 8, sources: { osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' } }, layers: [{ id: "osm", type: "raster", source: "osm" }] };
+
 const $ = id => document.getElementById(id);
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const color = g => COLORS[g] || COLORS.Other;
+const letterOf = n => { const c = n.trim().charAt(0).toUpperCase(); return c >= "A" && c <= "Z" ? c : "#"; };
 
-let all = [], shown = [], limit = PAGE, group = "", map, layer, markers = new Map(), activeId = null;
+const state = { g: "", c: "", q: "", t: "", sort: "name", inview: false, newonly: false, id: "" };
+let all = [], byId = new Map(), shown = [], limit = PAGE, groups = [], map, popup, cfg, hasLabels = false;
 
 async function load() {
-  const [cfg, data] = await Promise.all([
+  const [config, data] = await Promise.all([
     fetch("config.json").then(r => r.json()),
     fetch("data/businesses.json", { cache: "no-cache" }).then(r => r.json())
   ]);
+  cfg = config;
   document.title = $("title").textContent = cfg.title;
-  all = data.businesses.map(b => ({ ...b, hay: [b.name, b.category, b.group, b.address, b.town, b.notes].join(" ").toLowerCase() }));
+  if (new URLSearchParams(location.search).has("embed")) document.body.classList.add("embed");
 
-  map = L.map("map", { preferCanvas: true }).setView(cfg.center, cfg.zoom);
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-  }).addTo(map);
-  layer = L.layerGroup().addTo(map);
-  map.on("moveend", () => { if ($("inview").checked) render(); });
+  const cutoff = new Date(Date.now() - NEW_DAYS * 864e5).toISOString().slice(0, 10);
+  all = data.businesses.map(b => ({ ...b,
+    isNew: !!b.first_seen && b.first_seen >= cutoff,
+    hay: [b.name, b.category, b.group, b.address, b.town, b.notes].join(" ").toLowerCase() }));
+  all.sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
+  all.forEach(b => byId.set(b.id, b));
+  // Legend order: biggest group first, Other last.
+  const size = all.reduce((m, b) => (m[b.group] = (m[b.group] || 0) + 1, m), {});
+  groups = data.groups.slice().sort((x, y) => (x === "Other") - (y === "Other") || (size[y] || 0) - (size[x] || 0));
 
-  const towns = [...new Set(all.map(b => b.town).filter(Boolean))].sort();
+  const towns = Object.entries(all.reduce((m, b) => (b.town && (m[b.town] = (m[b.town] || 0) + 1), m), {}))
+    .filter(([, n]) => n >= 20).map(([t]) => t).sort();
   $("town").insertAdjacentHTML("beforeend", towns.map(t => `<option>${esc(t)}</option>`).join(""));
+  $("sub").textContent = `${all.length.toLocaleString()} places in ${towns.join(" and ") || "town"}, sorted so you can browse them.`;
+  $("newwrap").hidden = !all.some(b => b.isNew);
+  $("foot").innerHTML = data.release === "none" ? "No listings loaded yet."
+    : `Listings from <a href="https://overturemaps.org" target="_blank" rel="noopener">Overture Maps Foundation</a> release ${esc(data.release)}, with local corrections. Updated ${esc(data.updated)}.`;
 
-  $("foot").innerHTML = data.release === "none"
-    ? "No data yet. Run the Refresh workflow."
-    : `Places data: <a href="https://overturemaps.org">Overture Maps Foundation</a>, release ${esc(data.release)}, updated ${esc(data.updated)}, plus local edits.`;
-
-  group = groupFromHash(data.groups);
-  buildChips(data.groups);
-  ["input", "change"].forEach(e => { $("q").addEventListener(e, reset); $("town").addEventListener(e, reset); });
-  $("inview").addEventListener("change", reset);
-  window.addEventListener("hashchange", () => { group = groupFromHash(data.groups); syncChips(); reset(); });
-  $("share").addEventListener("click", copyLink);
+  readUrl();
+  buildRail();
+  wire();
+  await initMap();
   render();
+  if (state.id && byId.has(state.id)) select(state.id, true);
 }
 
-function groupFromHash(groups) {
-  const h = location.hash.slice(1);
-  return groups.find(g => slug(g) === h) || "";
+/* URL state: ?g=food-drink&c=coffee-shop&q=main&t=Blacksburg&id=... */
+function readUrl() {
+  const p = new URLSearchParams(location.search);
+  state.g = groups.find(g => slug(g) === (p.get("g") || location.hash.slice(1))) || "";
+  state.c = p.get("c") || ""; state.q = p.get("q") || ""; state.t = p.get("t") || ""; state.id = p.get("id") || "";
+  $("q").value = state.q; $("town").value = state.t;
+}
+function writeUrl() {
+  const p = new URLSearchParams();
+  if (state.g) p.set("g", slug(state.g));
+  if (state.c) p.set("c", state.c);
+  if (state.q) p.set("q", state.q);
+  if (state.t) p.set("t", state.t);
+  if (state.id) p.set("id", state.id);
+  if (document.body.classList.contains("embed")) p.set("embed", "1");
+  const s = p.toString();
+  try { history.replaceState(null, "", s ? "?" + s : location.pathname); } catch {}
 }
 
-function buildChips(groups) {
-  const counts = {};
-  all.forEach(b => counts[b.group] = (counts[b.group] || 0) + 1);
-  const chips = [`<button class="chip" data-g="">All <small>${all.length}</small></button>`]
-    .concat(groups.filter(g => counts[g]).map(g =>
-      `<button class="chip" data-g="${esc(g)}"><span class="dot" style="background:${COLORS[g] || COLORS.Other}"></span>${esc(g)} <small>${counts[g]}</small></button>`));
-  $("chips").innerHTML = chips.join("");
-  $("chips").addEventListener("click", e => {
-    const c = e.target.closest(".chip");
-    if (!c) return;
-    group = c.dataset.g;
-    history.replaceState(null, "", group ? "#" + slug(group) : location.pathname);
-    syncChips(); reset();
+function wire() {
+  $("q").addEventListener("input", e => { state.q = e.target.value.trim(); reset(); });
+  $("town").addEventListener("change", e => { state.t = e.target.value; reset(); });
+  $("sort").addEventListener("change", e => { state.sort = e.target.value; reset(); });
+  $("inview").addEventListener("change", e => { state.inview = e.target.checked; reset(); });
+  $("newonly").addEventListener("change", e => { state.newonly = e.target.checked; reset(); });
+  $("groups").addEventListener("click", e => { const c = e.target.closest(".chip"); if (c) { state.g = c.dataset.v; state.c = ""; reset(); } });
+  $("cats").addEventListener("click", e => { const c = e.target.closest(".chip"); if (c) { state.c = state.c === c.dataset.v ? "" : c.dataset.v; reset(); } });
+  $("clear").addEventListener("click", clearAll);
+  $("share").addEventListener("click", () => copy(location.href, $("share"), "Copy link to this view"));
+  $("toggle").addEventListener("click", () => {
+    const full = document.body.classList.toggle("listfull");
+    $("toggle").textContent = full ? "Show map" : "Bigger list";
+    setTimeout(() => map && map.resize(), 300);
   });
-  syncChips();
+  $("list").addEventListener("click", onListClick);
+  $("rail").addEventListener("click", e => { if (e.target.dataset.l) jump(e.target.dataset.l); });
+  new IntersectionObserver(es => { if (es.some(e => e.isIntersecting) && shown.length > limit) { limit += PAGE; drawList(true); } },
+    { root: $("list"), rootMargin: "400px" }).observe(sentinel());
 }
+function sentinel() { let s = $("sentinel"); if (!s) { s = document.createElement("li"); s.id = "sentinel"; } return s; }
 
-function syncChips() {
-  document.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", String(c.dataset.g === group)));
+function clearAll() {
+  Object.assign(state, { g: "", c: "", q: "", t: "", inview: false, newonly: false, id: "" });
+  $("q").value = ""; $("town").value = ""; $("inview").checked = false; $("newonly").checked = false;
+  popup?.remove();
+  map?.getSource("sel")?.setData({ type: "FeatureCollection", features: [] });
+  reset();
 }
+function reset() { limit = PAGE; $("list").scrollTop = 0; render(); }
 
-function reset() { limit = PAGE; render(); }
+function filterAll(skip) {
+  const terms = state.q.toLowerCase().split(/\s+/).filter(Boolean);
+  const bounds = state.inview && map ? map.getBounds() : null;
+  return all.filter(b =>
+    (skip === "g" || !state.g || b.group === state.g) &&
+    (skip === "g" || skip === "c" || !state.c || slug(b.category) === state.c) &&
+    (!state.t || b.town === state.t) &&
+    (!state.newonly || b.isNew) &&
+    terms.every(t => b.hay.includes(t)) &&
+    (!bounds || bounds.contains([b.lng, b.lat])));
+}
 
 function render() {
-  const terms = $("q").value.toLowerCase().split(/\s+/).filter(Boolean);
-  const town = $("town").value;
-  const bounds = $("inview").checked ? map.getBounds() : null;
-  shown = all.filter(b =>
-    (!group || b.group === group) &&
-    (!town || b.town === town) &&
-    terms.every(t => b.hay.includes(t)) &&
-    (!bounds || bounds.contains([b.lat, b.lng])));
-
-  $("n").textContent = `${shown.length.toLocaleString()} of ${all.length.toLocaleString()} businesses`;
-  const rows = shown.slice(0, limit).map(row).join("");
-  const more = shown.length > limit ? `<button id="more" type="button">Show ${Math.min(PAGE, shown.length - limit)} more</button>` : "";
-  $("list").innerHTML = shown.length ? rows + more : `<div id="empty">${all.length ? "Nothing matches these filters." : "No businesses loaded yet."}</div>`;
-  drawMarkers();
+  shown = filterAll();
+  if (state.sort === "near" && map) {
+    const c = map.getCenter(), k = Math.cos(c.lat * Math.PI / 180);
+    shown = shown.map(b => [(b.lat - c.lat) ** 2 + ((b.lng - c.lng) * k) ** 2, b]).sort((x, y) => x[0] - y[0]).map(x => x[1]);
+  }
+  if (state.id && !shown.includes(byId.get(state.id))) {
+    state.id = ""; popup?.remove();
+    map?.getSource("sel")?.setData({ type: "FeatureCollection", features: [] });
+  }
+  drawChips(); drawList(false); drawMap(); writeUrl();
+  const filtered = state.g || state.c || state.q || state.t || state.inview || state.newonly;
+  $("n").innerHTML = `<strong>${shown.length.toLocaleString()}</strong> ${shown.length === 1 ? "place" : "places"}${filtered ? ` of ${all.length.toLocaleString()}` : ""}`;
+  $("clear").hidden = !filtered;
 }
 
-function row(b) {
+function drawChips() {
+  // Counts reflect every other active filter, so a chip never promises results it can't deliver.
+  const pool = filterAll("g"), gc = {};
+  pool.forEach(b => gc[b.group] = (gc[b.group] || 0) + 1);
+  $("groups").innerHTML = `<button class="chip" data-v="" aria-pressed="${!state.g}">Everything <span class="n">${pool.length.toLocaleString()}</span></button>` +
+    groups.filter(g => gc[g] || g === state.g).map(g =>
+      `<button class="chip" data-v="${esc(g)}" aria-pressed="${g === state.g}"><span class="sw" style="background:${color(g)}"></span>${esc(g)} <span class="n">${gc[g] || 0}</span></button>`).join("");
+  if (!state.g) { $("cats").innerHTML = ""; return; }
+  const cc = {};
+  filterAll("c").forEach(b => { if (b.category) cc[b.category] = (cc[b.category] || 0) + 1; });
+  const top = Object.entries(cc).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  $("cats").innerHTML = top.length < 2 ? "" : top.map(([c, n]) =>
+    `<button class="chip" data-v="${esc(slug(c))}" aria-pressed="${slug(c) === state.c}">${esc(c.charAt(0).toUpperCase() + c.slice(1))} <span class="n">${n}</span></button>`).join("");
+}
+
+function rowHtml(b) {
   const q = encodeURIComponent([b.name, b.address, b.town].filter(Boolean).join(", "));
   const gmap = `https://www.google.com/maps/search/?api=1&query=${q}` + (b.google_place_id ? `&query_place_id=${encodeURIComponent(b.google_place_id)}` : "");
-  const site = /^https?:\/\//.test(b.website) ? `<a href="${esc(b.website)}" target="_blank" rel="noopener">Website</a>` : "";
-  const phone = b.phone ? `<span>${esc(b.phone)}</span>` : "";
-  return `<li data-id="${esc(b.id)}" class="${b.id === activeId ? "on" : ""}">
-    <div class="name"><span class="dot" style="background:${COLORS[b.group] || COLORS.Other}"></span>${esc(b.name)}</div>
-    <div class="meta">${esc([b.category || b.group, b.address, b.town].filter(Boolean).join(" · "))}</div>
-    ${b.notes ? `<div class="meta">${esc(b.notes)}</div>` : ""}
-    <div class="links">${site}${phone}<a href="${gmap}" target="_blank" rel="noopener">Open in Google Maps</a></div>
-  </li>`;
+  const web = /^https?:\/\//.test(b.website) ? `<a href="${esc(b.website)}" target="_blank" rel="noopener">Website</a>` : "";
+  const soc = /^https?:\/\//.test(b.social) ? `<a href="${esc(b.social)}" target="_blank" rel="noopener">${/facebook/.test(b.social) ? "Facebook" : "Social"}</a>` : "";
+  const tel = b.phone ? `<a href="tel:${esc(b.phone.replace(/[^+\d]/g, ""))}">Call ${esc(prettyPhone(b.phone))}</a>` : "";
+  const fix = cfg.suggest_url ? `<a href="${esc(cfg.suggest_url)}" target="_blank" rel="noopener">Suggest a correction</a>` : "";
+  const where = [b.address, b.town].filter(Boolean).join(", ");
+  return `<li class="biz${b.id === state.id ? " on" : ""}" data-id="${esc(b.id)}" tabindex="0">
+    <span class="sw" style="background:${color(b.group)}" title="${esc(b.group)}"></span>
+    <div><div class="nm">${esc(b.name)}${b.isNew ? '<span class="new">New</span>' : ""}</div>
+      <div class="ct">${esc(b.category || b.group)}${where ? `, ${esc(where)}` : ""}</div>
+      <div class="more">${b.notes ? `<p>${esc(b.notes)}</p>` : ""}
+        <div class="acts"><a class="primary" href="${gmap}" target="_blank" rel="noopener">Open in Google Maps</a>${tel}${web}${soc}
+          <button type="button" data-copy="${esc(b.id)}">Copy link</button>${fix}</div></div></div></li>`;
+}
+function prettyPhone(p) { const d = p.replace(/\D/g, "").replace(/^1(?=\d{10}$)/, ""); return d.length === 10 ? `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}` : p; }
+
+function drawList(append) {
+  const list = $("list"), alpha = state.sort === "name";
+  if (!shown.length) {
+    list.innerHTML = `<div id="empty">${all.length ? `Nothing matches. Try a broader word, or look across both towns.<br><button class="textbtn" type="button" onclick="clearAll()">Clear filters</button>` : "No listings loaded yet."}</div>`;
+    updateRail(); return;
+  }
+  const from = append ? list.querySelectorAll("li.biz").length : 0;
+  let html = "", prev = from ? letterOf(shown[from - 1].name) : "";
+  for (let i = from; i < Math.min(limit, shown.length); i++) {
+    const L = letterOf(shown[i].name);
+    if (alpha && L !== prev) { html += `<li class="letter" data-letter="${L}">${L === "#" ? "0–9" : L}</li>`; prev = L; }
+    html += rowHtml(shown[i]);
+  }
+  const s = sentinel(); s.remove();
+  if (append) list.insertAdjacentHTML("beforeend", html); else list.innerHTML = html;
+  list.appendChild(s);
+  updateRail();
 }
 
-function drawMarkers() {
-  layer.clearLayers(); markers.clear();
-  shown.forEach(b => {
-    const m = L.circleMarker([b.lat, b.lng], {
-      radius: 6, weight: 1, color: "#fff", fillColor: COLORS[b.group] || COLORS.Other, fillOpacity: .9
-    }).bindTooltip(b.name).on("click", () => select(b.id, false));
-    markers.set(b.id, m); layer.addLayer(m);
-  });
+function buildRail() { $("rail").innerHTML = LETTERS.map(l => `<button type="button" data-l="${l}" aria-label="Jump to ${l === "#" ? "numbers" : l}">${l}</button>`).join(""); }
+function updateRail() {
+  const alpha = state.sort === "name" && shown.length > 30;
+  $("rail").classList.toggle("off", !alpha);
+  if (!alpha) return;
+  const have = new Set(shown.map(b => letterOf(b.name)));
+  $("rail").querySelectorAll("button").forEach(b => b.disabled = !have.has(b.dataset.l));
 }
+function jump(L) {
+  const i = shown.findIndex(b => letterOf(b.name) === L);
+  if (i < 0) return;
+  if (i >= limit) { limit = i + PAGE; drawList(false); }
+  // Sticky letter headers ignore scrollIntoView once stuck, so position by the first row instead.
+  const list = $("list"), row = list.querySelector(`li.biz[data-id="${CSS.escape(shown[i].id)}"]`);
+  if (row) list.scrollTo({ top: list.scrollTop + row.getBoundingClientRect().top - list.getBoundingClientRect().top - 24, behavior: "instant" });
+}
+
+function onListClick(e) {
+  const cp = e.target.closest("[data-copy]");
+  if (cp) { const u = new URL(location.href); u.search = "?id=" + encodeURIComponent(cp.dataset.copy); copy(u.href, cp, "Copy link"); return; }
+  if (e.target.closest("a")) return;
+  const li = e.target.closest("li.biz");
+  if (li && li.dataset.id !== state.id) select(li.dataset.id, true);
+}
+$("list").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.matches("li.biz")) select(e.target.dataset.id, true); });
 
 function select(id, fly) {
-  activeId = id;
-  const i = shown.findIndex(b => b.id === id);
-  if (i >= limit) { limit = i + 1; render(); }
-  document.querySelectorAll("#list li").forEach(li => li.classList.toggle("on", li.dataset.id === id));
-  const m = markers.get(id);
-  if (m && fly) { map.setView(m.getLatLng(), Math.max(map.getZoom(), 17)); m.openTooltip(); }
-  if (!fly) document.querySelector(`#list li[data-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest" });
+  const b = byId.get(id); if (!b) return;
+  state.id = id;
+  let i = shown.indexOf(b);
+  if (i < 0) { clearAll(); state.id = id; i = shown.indexOf(b); }
+  if (i >= limit) { limit = i + PAGE; drawList(false); }
+  $("list").querySelectorAll("li.biz").forEach(li => li.classList.toggle("on", li.dataset.id === id));
+  const list = $("list"), row = list.querySelector(`li.biz[data-id="${CSS.escape(id)}"]`);
+  if (row) {
+    const r = row.getBoundingClientRect(), l = list.getBoundingClientRect();
+    if (r.top < l.top + 24 || r.bottom > l.bottom) list.scrollTo({ top: list.scrollTop + r.top - l.top - 24, behavior: "instant" });
+  }
+  writeUrl();
+  if (!map) return;
+  map.getSource("sel")?.setData(point(b));
+  popup.setLngLat([b.lng, b.lat]).setHTML(`<b>${esc(b.name)}</b>${esc(b.category || b.group)}`).addTo(map);
+  // essential: false lets MapLibre skip the animation for reduced-motion users.
+  if (fly) map.flyTo({ center: [b.lng, b.lat], zoom: Math.max(map.getZoom(), 16.5), speed: 1.4, essential: false });
 }
 
-$("list").addEventListener("click", e => {
-  if (e.target.id === "more") { limit += PAGE; render(); return; }
-  if (e.target.closest("a")) return;
-  const li = e.target.closest("li");
-  if (li) select(li.dataset.id, true);
-});
+async function copy(text, el, label) {
+  try { await navigator.clipboard.writeText(text); el.textContent = "Copied"; } catch { el.textContent = "Copy failed"; }
+  setTimeout(() => el.textContent = label, 2000);
+}
 
-async function copyLink() {
-  try { await navigator.clipboard.writeText(location.href); $("share").textContent = "Link copied"; }
-  catch { $("share").textContent = location.href; }
-  setTimeout(() => $("share").textContent = "Copy link to this view", 2500);
+/* Map */
+const point = b => ({ type: "Feature", geometry: { type: "Point", coordinates: [b.lng, b.lat] }, properties: { id: b.id, g: b.group } });
+
+async function initMap() {
+  if (!window.maplibregl) return;
+  let style = RASTER;
+  try {
+    const r = await fetch(BASEMAP, { signal: AbortSignal.timeout(6000) });
+    if (r.ok) { style = await r.json(); hasLabels = true; }
+  } catch {}
+  map = new maplibregl.Map({ container: "map", style, center: [cfg.center[1], cfg.center[0]], zoom: cfg.zoom, attributionControl: { compact: true } });
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+  map.addControl(new maplibregl.GeolocateControl({ trackUserLocation: false }), "top-right");
+  popup = new maplibregl.Popup({ closeButton: false, offset: 12, maxWidth: "240px" });
+  await new Promise(res => map.once("load", res));
+
+  map.addSource("biz", { type: "geojson", data: { type: "FeatureCollection", features: [] }, cluster: true, clusterRadius: 38, clusterMaxZoom: 15 });
+  map.addSource("sel", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addLayer({ id: "clusters", type: "circle", source: "biz", filter: ["has", "point_count"], paint: {
+    "circle-color": "#14302b", "circle-opacity": .88, "circle-stroke-color": "#fff", "circle-stroke-width": 2,
+    "circle-radius": ["step", ["get", "point_count"], 13, 25, 17, 100, 22, 400, 28] } });
+  if (hasLabels) map.addLayer({ id: "counts", type: "symbol", source: "biz", filter: ["has", "point_count"],
+    layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": ["Noto Sans Bold"], "text-size": 12, "text-allow-overlap": true },
+    paint: { "text-color": "#f3f5f1" } });
+  map.addLayer({ id: "dots", type: "circle", source: "biz", filter: ["!", ["has", "point_count"]], paint: {
+    "circle-color": ["match", ["get", "g"], ...Object.entries(COLORS).flat(), COLORS.Other],
+    "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 4, 16, 7.5], "circle-stroke-color": "#fff", "circle-stroke-width": 1.5 } });
+  map.addLayer({ id: "sel", type: "circle", source: "sel", paint: {
+    "circle-color": "rgba(0,0,0,0)", "circle-radius": 13, "circle-stroke-color": "#7a1f3d", "circle-stroke-width": 3 } });
+
+  map.on("click", "dots", e => select(e.features[0].properties.id, false));
+  map.on("click", "clusters", async e => {
+    const f = e.features[0];
+    const z = await map.getSource("biz").getClusterExpansionZoom(f.properties.cluster_id);
+    map.easeTo({ center: f.geometry.coordinates, zoom: z + .3 });
+  });
+  for (const l of ["dots", "clusters"]) {
+    map.on("mouseenter", l, () => map.getCanvas().style.cursor = "pointer");
+    map.on("mouseleave", l, () => map.getCanvas().style.cursor = "");
+  }
+  map.on("moveend", () => { if (state.inview || state.sort === "near") { limit = PAGE; render(); } });
+}
+
+function drawMap() {
+  map?.getSource("biz")?.setData({ type: "FeatureCollection", features: shown.map(point) });
 }
 
 load().catch(err => {
-  const hint = location.protocol === "file:"
-    ? " Open this folder with <code>python -m http.server 8000</code> and visit http://localhost:8000 — opening the HTML file directly does not load the listings."
-    : " If the list is empty, run <code>python scripts/refresh.py</code> to pull places data.";
-  $("list").innerHTML = `<div id="empty">Could not load the directory: ${esc(err.message)}. ${hint}</div>`;
+  const hint = location.protocol === "file:" ? " Serve this folder with <code>python -m http.server 8000</code> and open http://localhost:8000." : "";
+  $("list").innerHTML = `<div id="empty">The directory could not load: ${esc(err.message)}.${hint}</div>`;
 });
 </script>
 </body>

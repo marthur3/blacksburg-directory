@@ -13,6 +13,8 @@ import json
 import pathlib
 import re
 import sys
+import time
+import urllib.error
 import urllib.request
 
 import duckdb
@@ -33,8 +35,24 @@ def latest_release() -> str:
         CONFIG["releases_url"],
         headers={"User-Agent": "blacksburg-directory/1.0"},
     )
-    with urllib.request.urlopen(req, timeout=30) as r:
-        payload = json.load(r)
+    payload = None
+    for attempt in range(5):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                payload = json.load(r)
+            break
+        except urllib.error.HTTPError as e:
+            if e.code != 429 or attempt == 4:
+                raise
+            wait = 2 ** attempt
+            print(f"STAC catalog HTTP 429, retrying in {wait}s", file=sys.stderr)
+            time.sleep(wait)
+        except urllib.error.URLError as e:
+            if attempt == 4:
+                raise
+            wait = 2 ** attempt
+            print(f"STAC catalog {e.reason}, retrying in {wait}s", file=sys.stderr)
+            time.sleep(wait)
     latest = payload.get("latest")
     if not latest:
         raise SystemExit(f"No 'latest' release in {CONFIG['releases_url']}")
@@ -73,6 +91,10 @@ def normalize_town(town: str) -> str:
     return TOWN_FIX.get(town.lower(), town)
 
 
+# Landmarks Overture files under places; a business directory has no use for them.
+NOT_BUSINESSES = {"mountain", "river", "bridge", "geographic entities", "hot springs"}
+
+
 def pull(source: str) -> list[dict]:
     con = duckdb.connect()
     if source.startswith("s3://"):
@@ -106,6 +128,8 @@ def to_record(row: dict) -> dict | None:
         return None
 
     basic = row.get("basic_category") or ""
+    if str(basic).replace("_", " ") in NOT_BUSINESSES:
+        return None
     taxonomy = row.get("taxonomy") if isinstance(row.get("taxonomy"), dict) else {}
     tax_primary = (taxonomy or {}).get("primary") or ""
     cat_text = " ".join([name, basic, flatten(row.get("taxonomy")), flatten(row.get("categories"))])
@@ -207,6 +231,10 @@ def main() -> None:
     old = {}
     if OUT.exists():
         old = {r["id"]: r for r in json.loads(OUT.read_text()).get("businesses", [])}
+    # Listings absent from the previous run are stamped; the page uses this for "New".
+    today = dt.date.today().isoformat()
+    for rid, rec in records.items():
+        rec["first_seen"] = old[rid].get("first_seen", "") if rid in old else (today if old else "")
     write_changes(old, records, release)
 
     businesses = sorted(records.values(), key=lambda r: r["name"].lower())
