@@ -23,7 +23,7 @@
   a { color: var(--maroon); text-underline-offset: 2px; }
 
   /* Index panel */
-  #panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; background: var(--paper); border-right: 1px solid var(--stone); }
+  #panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden auto; background: var(--paper); border-right: 1px solid var(--stone); }
   #masthead { padding: 18px 20px 14px; background: var(--spruce); color: var(--chalk); }
   h1 { margin: 0; font-size: 34px; line-height: .95; font-weight: 800; font-stretch: 68%; letter-spacing: -.005em; }
   #sub { margin: 6px 0 12px; font-size: 13px; color: #b9c8c1; }
@@ -60,7 +60,7 @@
   #status strong { color: var(--spruce); font-weight: 700; font-variant-numeric: tabular-nums; }
   .textbtn { border: 0; background: none; padding: 0; color: var(--maroon); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 
-  #body { flex: 1; min-height: 0; overflow: hidden; display: grid; grid-template-columns: 1fr 22px; grid-template-rows: minmax(0, 1fr); }
+  #body { flex: 1 0 260px; min-height: 0; overflow: hidden; display: grid; grid-template-columns: 1fr 22px; grid-template-rows: minmax(0, 1fr); }
   #list { overflow-y: auto; margin: 0; padding: 0; list-style: none; position: relative; }
   #list li.biz { display: grid; grid-template-columns: 14px 1fr; column-gap: 10px; padding: 10px 12px 10px 20px; border-bottom: 1px solid #e6eae4; cursor: pointer; }
   #list li.biz:hover { background: var(--chalk); }
@@ -168,19 +168,20 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&
 const color = g => COLORS[g] || COLORS.Other;
 const letterOf = n => { const c = n.trim().charAt(0).toUpperCase(); return c >= "A" && c <= "Z" ? c : "#"; };
 
-const state = { g: "", c: "", q: "", t: "", sort: "name", inview: false, newonly: false, id: "" };
-let all = [], byId = new Map(), shown = [], limit = PAGE, groups = [], map, popup, cfg, hasLabels = false;
+const state = { g: "", c: "", q: "", t: "", sort: "name", inview: false, newonly: false, id: "", flag: "" };
+let all = [], byId = new Map(), shown = [], limit = PAGE, groups = [], map, popup, cfg, hasLabels = false, DATA, CUTOFF;
 
 async function load() {
   const [config, data] = await Promise.all([
     fetch("config.json").then(r => r.json()),
     fetch("data/businesses.json", { cache: "no-cache" }).then(r => r.json())
   ]);
-  cfg = config;
+  cfg = config; DATA = data;
+  const editing = wantsEdit();   // read before render() rewrites the URL
   document.title = $("title").textContent = cfg.title;
   if (new URLSearchParams(location.search).has("embed")) document.body.classList.add("embed");
 
-  const cutoff = new Date(Date.now() - NEW_DAYS * 864e5).toISOString().slice(0, 10);
+  const cutoff = CUTOFF = new Date(Date.now() - NEW_DAYS * 864e5).toISOString().slice(0, 10);
   all = data.businesses.map(b => ({ ...b,
     isNew: !!b.first_seen && b.first_seen >= cutoff,
     hay: [b.name, b.category, b.group, b.address, b.town, b.notes].join(" ").toLowerCase() }));
@@ -203,7 +204,21 @@ async function load() {
   wire();
   await initMap();
   render();
+  if (editing) await loadEditor();
   if (state.id && byId.has(state.id)) select(state.id, true);
+}
+
+/* Owner edit mode lives in edit.js so visitors never download it. */
+function wantsEdit() {
+  if (new URLSearchParams(location.search).has("edit")) return true;
+  try { return !!localStorage.getItem("bd_edit"); } catch { return false; }
+}
+function loadEditor() {
+  return new Promise(res => {
+    const s = document.createElement("script");
+    s.src = "edit.js"; s.onload = () => { initEdit(); res(); }; s.onerror = res;
+    document.head.appendChild(s);
+  });
 }
 
 /* URL state: ?g=food-drink&c=coffee-shop&q=main&t=Blacksburg&id=... */
@@ -248,7 +263,7 @@ function wire() {
 function sentinel() { let s = $("sentinel"); if (!s) { s = document.createElement("li"); s.id = "sentinel"; } return s; }
 
 function clearAll() {
-  Object.assign(state, { g: "", c: "", q: "", t: "", inview: false, newonly: false, id: "" });
+  Object.assign(state, { g: "", c: "", q: "", t: "", inview: false, newonly: false, id: "", flag: "" });
   $("q").value = ""; $("town").value = ""; $("inview").checked = false; $("newonly").checked = false;
   popup?.remove();
   map?.getSource("sel")?.setData({ type: "FeatureCollection", features: [] });
@@ -264,6 +279,7 @@ function filterAll(skip) {
     (skip === "g" || skip === "c" || !state.c || slug(b.category) === state.c) &&
     (!state.t || b.town === state.t) &&
     (!state.newonly || b.isNew) &&
+    (!state.flag || (b.flag || "").split("; ").includes(state.flag)) &&
     terms.every(t => b.hay.includes(t)) &&
     (!bounds || bounds.contains([b.lng, b.lat])));
 }
@@ -278,8 +294,9 @@ function render() {
     state.id = ""; popup?.remove();
     map?.getSource("sel")?.setData({ type: "FeatureCollection", features: [] });
   }
+  if (state.sort === "conf") shown = shown.slice().sort((a, b) => (a.conf || 1) - (b.conf || 1));
   drawChips(); drawList(false); drawMap(); writeUrl();
-  const filtered = state.g || state.c || state.q || state.t || state.inview || state.newonly;
+  const filtered = state.g || state.c || state.q || state.t || state.inview || state.newonly || state.flag;
   $("n").innerHTML = `<strong>${shown.length.toLocaleString()}</strong> ${shown.length === 1 ? "place" : "places"}${filtered ? ` of ${all.length.toLocaleString()}` : ""}`;
   $("clear").hidden = !filtered;
 }
@@ -309,11 +326,11 @@ function rowHtml(b) {
   const where = [b.address, b.town].filter(Boolean).join(", ");
   return `<li class="biz${b.id === state.id ? " on" : ""}" data-id="${esc(b.id)}" tabindex="0">
     <span class="sw" style="background:${color(b.group)}" title="${esc(b.group)}"></span>
-    <div><div class="nm">${esc(b.name)}${b.isNew ? '<span class="new">New</span>' : ""}</div>
+    <div><div class="nm">${esc(b.name)}${b.isNew ? '<span class="new">New</span>' : ""}${window.badgeHtml ? badgeHtml(b) : ""}</div>
       <div class="ct">${esc(b.category || b.group)}${where ? `, ${esc(where)}` : ""}</div>
       <div class="more">${b.notes ? `<p>${esc(b.notes)}</p>` : ""}
         <div class="acts"><a class="primary" href="${gmap}" target="_blank" rel="noopener">Open in Google Maps</a>${tel}${web}${soc}
-          <button type="button" data-copy="${esc(b.id)}">Copy link</button>${fix}</div></div></div></li>`;
+          <button type="button" data-copy="${esc(b.id)}">Copy link</button>${fix}</div>${window.editorHtml ? editorHtml(b) : ""}</div></div></li>`;
 }
 function prettyPhone(p) { const d = p.replace(/\D/g, "").replace(/^1(?=\d{10}$)/, ""); return d.length === 10 ? `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}` : p; }
 

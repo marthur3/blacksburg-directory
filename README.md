@@ -75,3 +75,32 @@ Ids come from `data/businesses.json`. Valid groups are listed in `scripts/groups
 - Shareable links: `?g=food-drink&c=coffee-shop`, `?q=main+st`, `?id=<listing id>`. Add `&embed=1` to hide the title for iframes.
 - "New listings" appears once a refresh finds places the previous run did not have (`first_seen` in the data).
 - Set `"suggest_url"` in `config.json` to a form or email link to show "Suggest a correction" on every listing.
+
+## Owner edit mode
+
+Open the site with `?edit=1` (not linked from the public page). Visitors who do not open that URL never load the editor, and even then they cannot write without their own GitHub token.
+
+- Open a listing to change its group or kind, add a note, toggle flags, or hide it with a reason.
+- Changes stage in the browser first. "Save to directory" writes them to `overrides.csv` as one commit, and the refresh workflow rebuilds the data.
+- Saving needs a fine-grained GitHub token for this repo only, with Contents set to read and write. The token is kept in this browser's localStorage and sent only to `api.github.com` as an `Authorization` header (never in a URL, log, or git commit). Revoke it if you used a shared computer. Other GitHub Pages sites on the same `*.github.io` origin can read localStorage — do not store a token if you host untrusted Pages on this account.
+- After moving or hiding a listing, the bar offers the same action for every listing of that kind. Accepting adds a `rule-group` or `rule-hide` row.
+- "Patterns" lists kinds you have corrected twice or more, and checks whether low source confidence predicts the listings you hid as closed.
+- "Least certain first" sorts by Overture's confidence score, which puts likely-closed listings at the top.
+
+Notes show on the public listing. Flags and hide reasons are not shown on the page, but the repo and data file are public.
+
+### overrides.csv actions
+
+| action | Key column | Effect |
+|---|---|---|
+| `add` | name, lat, lng | Adds a listing |
+| `edit` | id | Overwrites filled columns. `-` clears a column |
+| `hide` | id | Hides one listing. `notes` holds the reason |
+| `rule-group` | category | Moves every listing of that kind to `group` |
+| `rule-hide` | category | Hides every listing of that kind |
+
+A listing row beats a kind rule. Delete a rule row to undo it.
+
+## Grouping
+
+`scripts/groups.py` trusts sources in this order: the exact-category map `KIND_GROUP`, keyword rules on the category, keyword rules on the taxonomy, then the listing name.
