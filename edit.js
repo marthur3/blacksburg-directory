@@ -7,20 +7,20 @@ const FLAGS = ["Wrong category", "Closed?", "Duplicate?", "Check in person", "Fa
 const HIDE_REASONS = ["Closed", "Duplicate", "Not a business", "Not relevant"];
 const API = "https://api.github.com";
 
-const ed = { records: [], orig: new Map(), pending: emptyEdits(), saved: [], log: [], showHidden: false, toast: null, busy: false };
+const ed = { added: new Set(), records: [], orig: new Map(), pending: emptyEdits(), saved: [], log: [], showHidden: false, toast: null, busy: false };
 
-function emptyEdits() { return { listings: {}, rules: {} }; }
+function emptyEdits() { return { listings: {}, rules: {}, adds: {} }; }
 function lsGet(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } }
 function lsSet(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 const kindOf = r => (r.category || "").trim().toLowerCase();
-const count = o => Object.keys(o.listings).length + Object.keys(o.rules).length;
+const count = o => Object.keys(o.listings).length + Object.keys(o.rules).length + Object.keys(o.adds || {}).length;
 
 function initEdit() {
   lsSet(LS.on, 1);
   document.body.classList.add("editing"); setCompact(); setTimeout(() => map && map.resize(), 350);
   ed.records = DATA.businesses.map(b => ({ ...b })).concat((DATA.hidden || []).map(h => ({ ...h, hidden: true })));
   ed.records.forEach(r => ed.orig.set(r.id, { ...r }));
-  ed.pending = lsGet(LS.pending, emptyEdits());
+  ed.pending = { ...emptyEdits(), ...lsGet(LS.pending, {}) };
   // Saved edits stay applied on top of the page data until a rebuild newer than the save arrives.
   ed.saved = lsGet(LS.saved, []).filter(s => !DATA.built || s.at > DATA.built);
   lsSet(LS.saved, ed.saved);
@@ -42,6 +42,18 @@ function initEdit() {
 
 /* Rebuilds every record from its original, then layers saved and pending edits on top. */
 function applyEdits() {
+  // Staged additions are rebuilt on every pass, so undo removes them cleanly.
+  ed.records = ed.records.filter(r => !ed.added.has(r.id));
+  ed.added.forEach(id => ed.orig.delete(id)); ed.added.clear();
+  for (const layer of [...ed.saved.map(s => s.edits), ed.pending]) {
+    for (const [id, a] of Object.entries(layer.adds || {})) {
+      if (ed.orig.has(id)) continue;
+      const rec = { id, name: a.name, group: a.group, category: a.category || "", address: a.address || "", town: a.town || "",
+        lat: a.lat, lng: a.lng, website: a.website || "", phone: a.phone || "", social: "", google_place_id: "",
+        notes: a.notes || "", flag: "", source: "manual" };
+      ed.records.push(rec); ed.orig.set(id, { ...rec }); ed.added.add(id);
+    }
+  }
   for (const r of ed.records) {
     const o = ed.orig.get(r.id);
     for (const k of Object.keys(r)) if (!(k in o)) delete r[k];
@@ -65,7 +77,7 @@ function applyEdits() {
     }
   }
   for (const r of ed.records) {
-    r.edited = !!(ed.pending.listings[r.id]);
+    r.edited = !!(ed.pending.listings[r.id] || ed.pending.adds[r.id]);
     r.isNew = !!r.first_seen && r.first_seen >= CUTOFF;
     r.hay = [r.name, r.category, r.group, r.address, r.town, r.notes, r.flag].join(" ").toLowerCase();
   }
@@ -222,7 +234,7 @@ function drawPatterns() {
     ${cs ? `<p>Half of the ${cs.n} listings you hid as closed had source confidence of ${Math.round(cs.median * 100)}% or less. ${cs.below} visible listings sit at or below that. <button type="button" data-act="leastcertain">Review them, least certain first</button></p>`
       : `<p>Hide five closed listings and this panel will show whether low source confidence predicts closures.</p>`}
     ${rules.length ? `<h2>Rules for whole kinds</h2><ul>${rules.map(([k, r]) => `<li>“${esc(k)}” ${r.hide ? "is hidden" : `goes to ${esc(r.group)}`}</li>`).join("")}</ul>` : ""}
-    <p><button type="button" data-act="account">GitHub token and account</button></p>`;
+    <p><button type="button" data-act="add" class="go">Add a missing business</button> <button type="button" data-act="account">GitHub token and account</button></p>`;
 }
 function drawAccount(msg) {
   const has = !!lsGet(LS.token);
@@ -235,11 +247,46 @@ function drawAccount(msg) {
     <p><button type="button" data-act="signout">Leave edit mode on this device</button> <button type="button" data-act="close">Close</button></p>`;
 }
 /* The tools panel takes over the list area while open, so nothing gets squeezed. */
-function closePanel() { $("edpanel").hidden = true; $("panel").classList.remove("paneling"); }
+function closePanel() { $("edpanel").hidden = true; $("panel").classList.remove("paneling"); $("mapwrap").classList.remove("aiming"); }
+
+/* Add a listing the feed lacks. Its location is wherever the map's crosshair sits. */
+function drawAdd(msg) {
+  const towns = [...$("town").options].map(o => o.value).filter(Boolean);
+  $("edpanel").innerHTML = `<div class="edrow"><h2>Add a missing business</h2><button type="button" data-act="close">Cancel</button></div>
+    <p>Move the map until the crosshair sits on the building. Searching the list for a neighbor and tapping it gets you close.</p>
+    <form id="addform" class="ed">
+      <label>Name <input name="name" required autocomplete="off"></label>
+      <label>Group <select name="group">${DATA.groups.map(g => `<option${g === "Professional Services" ? " selected" : ""}>${esc(g)}</option>`).join("")}</select></label>
+      <label>Kind <input name="category" list="kinds" autocomplete="off" placeholder="professional service"></label>
+      <label>Street <input name="address" autocomplete="off"></label>
+      <label>Town <select name="town">${towns.map(t => `<option>${esc(t)}</option>`).join("")}</select></label>
+      <label>Web <input name="website" type="url" placeholder="https://" autocomplete="off"></label>
+      <label>Phone <input name="phone" type="tel" autocomplete="off"></label>
+      <label>Note <input name="notes" autocomplete="off" placeholder="Shown on the public listing"></label>
+      <div class="edacts"><button class="go">Add at the crosshair</button><small id="addpos"></small></div>
+      ${msg ? `<p class="msg">${msg}</p>` : ""}
+    </form>`;
+  const show = () => { const c = map?.getCenter(), el = $("addpos"); if (c && el) el.textContent = `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`; };
+  show(); if (map && !ed.aimHooked) { map.on("move", show); ed.aimHooked = true; ed.showAim = show; }
+}
+function onAddSubmit(e) {
+  const f = Object.fromEntries([...new FormData(e.target)].map(([k, v]) => [k, String(v).trim()]));
+  if (!map) return drawAdd("The map is not available, so there is no location to use.");
+  if (!f.name) return;
+  const c = map.getCenter();
+  let id = "manual-" + slug(f.name), n = 2;
+  while (ed.orig.has(id) || ed.pending.adds[id]) id = `manual-${slug(f.name)}-${n++}`;
+  ed.log.push(JSON.stringify(ed.pending));
+  ed.pending.adds[id] = { ...f, category: f.category.toLowerCase(), lat: +c.lat.toFixed(6), lng: +c.lng.toFixed(6) };
+  ed.toast = `Added ${esc(f.name)}. Save to publish it.`;
+  closePanel(); applyEdits();
+  state.q = ""; $("q").value = ""; select(id, false);
+}
 function openPanel(view) {
   const p = $("edpanel");
   p.hidden = false; p.dataset.view = view; $("panel").classList.add("paneling");
-  view === "patterns" ? drawPatterns() : drawAccount();
+  $("mapwrap").classList.toggle("aiming", view === "add");
+  view === "patterns" ? drawPatterns() : view === "add" ? drawAdd() : drawAccount();
 }
 function togglePanel(view) {
   const p = $("edpanel");
@@ -250,11 +297,13 @@ function onPanelClick(e) {
   if (e.target.dataset.rule) applyRuleButton(e.target);
   if (act === "close") closePanel();
   if (act === "account") openPanel("account");
+  if (act === "add") openPanel("add");
   if (act === "leastcertain") { state.sort = "conf"; $("sort").value = "conf"; closePanel(); reset(); }
   if (act === "signout") { [LS.token, LS.on].forEach(k => lsSet(k, null)); location.href = location.pathname; }
 }
 async function onTokenSubmit(e) {
   e.preventDefault();
+  if (e.target.id === "addform") return onAddSubmit(e);
   const token = new FormData(e.target).get("token").trim(); if (!token) return;
   if (!/^(github_pat_|ghp_)/.test(token)) {
     drawAccount("That does not look like a GitHub token (it should start with github_pat_ or ghp_). Nothing was stored.");
@@ -302,6 +351,10 @@ function mergeCsv(text, edits) {
     rows = rows.filter(r => !(isRule(r) && r.category.trim().toLowerCase() === kind));
     rows.push(rule.hide ? { action: "rule-hide", category: kind } : { action: "rule-group", category: kind, group: rule.group });
   }
+  for (const [id, a] of Object.entries(edits.adds || {})) {
+    rows = rows.filter(r => !(r.id === id && r.action === "add"));
+    rows.push({ action: "add", id, ...a });
+  }
   for (const [id, p] of Object.entries(edits.listings)) {
     const added = rows.find(r => r.id === id && r.action === "add");
     if (typeof p.hide === "string") {
@@ -341,6 +394,9 @@ async function save() {
 
 const ED_CSS = `
   #panel.paneling > #filters, #panel.paneling > #status, #panel.paneling > #body, #panel.paneling > footer { display: none; }
+  #mapwrap.aiming::after { content: ""; position: absolute; left: 50%; top: 50%; width: 28px; height: 28px; margin: -14px 0 0 -14px; pointer-events: none; z-index: 2;
+    background: linear-gradient(var(--maroon), var(--maroon)) center / 2px 100% no-repeat, linear-gradient(var(--maroon), var(--maroon)) center / 100% 2px no-repeat; }
+  #addform { border-top: 0; padding-top: 0; }
   #edbar { padding: 6px 20px; background: #fff7e0; border-bottom: 1px solid #e3cf8f; font-size: 13px; }
   .edrow { display: flex; flex-wrap: wrap; gap: 6px 10px; justify-content: space-between; align-items: center; }
   .edrow.sub { margin-top: 6px; justify-content: flex-start; color: var(--lichen); }

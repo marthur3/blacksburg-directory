@@ -292,7 +292,9 @@ function wire() {
   new IntersectionObserver(es => { if (es.some(e => e.isIntersecting) && shown.length > limit) { limit += PAGE; drawList(true); } },
     { root: $("list"), rootMargin: "400px" }).observe(sentinel());
 }
-function sentinel() { let s = $("sentinel"); if (!s) { s = document.createElement("li"); s.id = "sentinel"; } return s; }
+// One element for the life of the page, so the observer keeps watching the node the list re-appends.
+const SENTINEL = Object.assign(document.createElement("li"), { id: "sentinel" });
+function sentinel() { return SENTINEL; }
 
 function clearAll() {
   Object.assign(state, { g: "", c: "", q: "", t: "", inview: false, newonly: false, id: "", flag: "" });
@@ -364,7 +366,7 @@ function rowHtml(b) {
       <div class="ct">${esc(b.category || b.group)}${where ? `, ${esc(where)}` : ""}</div>
       <div class="more">${b.notes ? `<p>${esc(b.notes)}</p>` : ""}
         <div class="acts"><a class="primary" href="${gmap}" target="_blank" rel="noopener">Open in Google Maps</a>${tel}${web}${soc}
-          <button type="button" data-copy="${esc(b.id)}">Copy link</button>${fix}</div>${window.editorHtml ? editorHtml(b) : ""}</div></div></li>`;
+          <button type="button" data-copy="${esc(b.id)}">Copy link</button>${fix}</div>${window.editorHtml && b.id === state.id ? editorHtml(b) : ""}</div></div></li>`;
 }
 function prettyPhone(p) { const d = p.replace(/\D/g, "").replace(/^1(?=\d{10}$)/, ""); return d.length === 10 ? `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}` : p; }
 
@@ -415,12 +417,18 @@ $("list").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.m
 
 function select(id, fly) {
   const b = byId.get(id); if (!b) return;
+  const prev = state.id;
   state.id = id;
   let i = shown.indexOf(b);
   if (i < 0) { clearAll(); state.id = id; i = shown.indexOf(b); }
   if (i >= limit) { limit = i + PAGE; drawList(false); }
-  $("list").querySelectorAll("li.biz").forEach(li => li.classList.toggle("on", li.dataset.id === id));
-  const list = $("list"), row = list.querySelector(`li.biz[data-id="${CSS.escape(id)}"]`);
+  // Only the open row carries the editor, so redraw the rows that change state.
+  const list = $("list");
+  for (const rid of new Set([prev, id])) {
+    const li = rid && list.querySelector(`li.biz[data-id="${CSS.escape(rid)}"]`), rec = byId.get(rid);
+    if (li && rec) li.outerHTML = rowHtml(rec);
+  }
+  const row = list.querySelector(`li.biz[data-id="${CSS.escape(id)}"]`);
   if (row) {
     const r = row.getBoundingClientRect(), l = list.getBoundingClientRect();
     if (r.top < l.top + 24 || r.bottom > l.bottom) list.scrollTo({ top: list.scrollTop + r.top - l.top - 24, behavior: "instant" });
