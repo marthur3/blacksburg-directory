@@ -1,12 +1,14 @@
-action,id,name,group,category,address,town,lat,lng,website,phone,google_place_id,notes
-hide,6fc3b67c-e7f8-49be-9a65-e7969d1c4b2d,,,,,,,,,,,closed campus pop-up
-hide,126701a9-81ff-4167-80c6-c6f215a63758,,,,,,,,,,,closed; replaced by Baan Thai
-hide,1aaf31cf-3a61-4c9f-b688-bf4416059bd3,,,,,,,,,,,duplicate of listed Owens Food Court
-edit,bd21984a-300f-4525-9e39-0e518274a47f,,Arts & Entertainment,,,,,,,,,
-edit,d5b58b17-9f91-4558-a393-06b57e8668c8,,Food & Drink,campus dining,,,,,,,,Virginia Tech dining hall
-edit,7fd03b21-526c-4c4b-9e88-46128afe6934,,Food & Drink,campus dining,,,,,,,,Virginia Tech dining hall (Dietrick)
-add,manual-boudreauxs,Boudreaux's,Food & Drink,restaurant,205 N Main St,Blacksburg,37.230095,-80.414869,https://boudreauxs.com,+15409612330,,Cajun restaurant; missing from Overture
-add,manual-the-local,The Local,Shopping,retail incubator,414 N Main St,Blacksburg,37.231858,-80.416211,https://www.thelocalblacksburg.com,,,Downtown retail incubator (Moon Hollow Coffee and shops)
-add,manual-slake,SLAKE Sip and Savor,Food & Drink,restaurant,610 N Main St,Blacksburg,37.234109,-80.418727,,+14077172748,,Missing from Overture
-add,manual-moeya,Moeya Japanese Café,Food & Drink,restaurant,202 S Main St Ste 10,Blacksburg,37.228381,-80.413307,https://moeyajapanesecafe.peblla.com,+15403159063,,Missing from Overture
-add,manual-baan-thai,Baan Thai,Food & Drink,restaurant,1202 S Main St,Blacksburg,37.218766,-80.402830,https://baanthaibburg.com,+15403159174,,Missing from Overture
+action,id,name,group,category,address,town,lat,lng,website,phone,google_place_id,notes,flag
+hide,6fc3b67c-e7f8-49be-9a65-e7969d1c4b2d,,,,,,,,,,,closed campus pop-up,
+hide,126701a9-81ff-4167-80c6-c6f215a63758,,,,,,,,,,,closed; replaced by Baan Thai,
+hide,1aaf31cf-3a61-4c9f-b688-bf4416059bd3,,,,,,,,,,,duplicate of listed Owens Food Court,
+edit,bd21984a-300f-4525-9e39-0e518274a47f,,Arts & Entertainment,,,,,,,,,,
+edit,d5b58b17-9f91-4558-a393-06b57e8668c8,,Food & Drink,campus dining,,,,,,,,Virginia Tech dining hall,
+edit,7fd03b21-526c-4c4b-9e88-46128afe6934,,Food & Drink,campus dining,,,,,,,,Virginia Tech dining hall (Dietrick),
+add,manual-boudreauxs,Boudreaux's,Food & Drink,restaurant,205 N Main St,Blacksburg,37.230095,-80.414869,https://boudreauxs.com,+15409612330,,Cajun restaurant; missing from Overture,
+add,manual-the-local,The Local,Shopping,retail incubator,414 N Main St,Blacksburg,37.231858,-80.416211,https://www.thelocalblacksburg.com,,,Downtown retail incubator (Moon Hollow Coffee and shops),
+add,manual-slake,SLAKE Sip and Savor,Food & Drink,restaurant,610 N Main St,Blacksburg,37.234109,-80.418727,,+14077172748,,Missing from Overture,
+add,manual-moeya,Moeya Japanese Café,Food & Drink,restaurant,202 S Main St Ste 10,Blacksburg,37.228381,-80.413307,https://moeyajapanesecafe.peblla.com,+15403159063,,Missing from Overture,
+add,manual-baan-thai,Baan Thai,Food & Drink,restaurant,1202 S Main St,Blacksburg,37.218766,-80.402830,https://baanthaibburg.com,+15403159174,,Missing from Overture,
+edit,f5a2b776-eeb7-419f-a5e3-3a556ced691a,,Arts & Entertainment,independent media,,,,,,,,,
+edit,85d8a1a7-55ca-4a82-bc76-e9dc7d2c59da,,,,,,,,,,,,Wrong category
