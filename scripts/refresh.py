@@ -20,7 +20,7 @@ import urllib.request
 import duckdb
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from groups import GROUPS, group_for  # noqa: E402
+from groups import GROUPS, group_for, is_excluded  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CONFIG = json.loads((ROOT / "config.json").read_text())
@@ -248,6 +248,14 @@ def apply_overrides(records: dict[str, dict]) -> tuple[list[dict], list[dict]]:
     return sorted(hidden.values(), key=lambda r: r["name"].lower()), rules
 
 
+def drop_excluded(records: dict[str, dict], hidden: list[dict], cfg: dict | None = None) -> list[dict]:
+    """Drop listings in config exclude_ids / exclude_names. They are not kept in hidden."""
+    cfg = cfg if cfg is not None else CONFIG
+    for rid in [rid for rid, rec in records.items() if is_excluded(cfg, rec)]:
+        records.pop(rid)
+    return [rec for rec in hidden if not is_excluded(cfg, rec)]
+
+
 def write_changes(old: dict[str, dict], new: dict[str, dict], release: str) -> None:
     added = [new[k] for k in new.keys() - old.keys()]
     removed = [old[k] for k in old.keys() - new.keys()]
@@ -280,6 +288,7 @@ def main() -> None:
         if rec:
             records[rec["id"]] = rec
     hidden, rules = apply_overrides(records)
+    hidden = drop_excluded(records, hidden)
 
     old = {}
     if OUT.exists():

@@ -126,3 +126,16 @@ def group_for(category: str, taxonomy_text: str = "", name: str = "") -> str:
         if group != "Other":
             return group
     return "Other"
+
+
+def name_key(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", (s or "").lower())
+
+
+def is_excluded(cfg: dict, rec: dict) -> bool:
+    """True if config exclude_ids / exclude_names match this listing."""
+    if (rec.get("id") or "") in set(cfg.get("exclude_ids") or []):
+        return True
+    key = name_key(rec.get("name") or "")
+    names = {name_key(n) for n in (cfg.get("exclude_names") or [])}
+    return bool(key) and key in names

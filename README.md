@@ -103,7 +103,7 @@ Public submit path: `/events/submit/`. With `event_submit_url` empty, that form 
 
 ## Guide pages
 
-`scripts/pages.py` builds them from current listings. Re-run it after a refresh. Joe's Diner is kept off "On the radar" spots.
+`scripts/pages.py` builds them from current listings. Re-run it after a refresh. Names and ids in `config.json` `exclude_names` / `exclude_ids` are omitted from the data and from these pages.
 
 Set `site_url` if the public origin is not `https://<user>.github.io/<repo>/` (custom domain). `site_name` is the newsletter name on those pages.
 

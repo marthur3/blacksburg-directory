@@ -171,6 +171,29 @@ def test_index_nav_points_at_new_routes():
     assert 'href="newsletter/"' in src
 
 
+JOE_ID = "503dc8cb-13f9-4b0a-a2ed-65e8d9e7aefe"
+JOE_NEEDLES = ("Joe's Diner", "Joe&#x27;s Diner", JOE_ID, "joesdinerva")
+
+
+def test_joes_diner_absent_from_site():
+    biz = json.loads((ROOT / "data" / "businesses.json").read_text(encoding="utf-8"))
+    for bucket in ("businesses", "hidden"):
+        for b in biz.get(bucket) or []:
+            assert b.get("id") != JOE_ID, bucket
+            assert norm_name(b.get("name") or "") != "joesdiner", b.get("name")
+    for ev in json.loads((ROOT / "events.json").read_text(encoding="utf-8")).get("events") or []:
+        assert ev.get("listing_id") != JOE_ID
+        assert norm_name(ev.get("venue") or "") != "joesdiner"
+    roots = [ROOT / "best", ROOT / "blacksburg", ROOT / "christiansburg", ROOT / "events", ROOT / "newsletter"]
+    files = [ROOT / "sitemap.xml", ROOT / "index.html"]
+    for folder in roots:
+        files.extend(folder.rglob("*.html"))
+    for path in files:
+        text = path.read_text(encoding="utf-8")
+        for needle in JOE_NEEDLES:
+            assert needle not in text, f"{path} still has {needle}"
+
+
 if __name__ == "__main__":
     tests = [
         test_featured_skips_joes_diner, test_featured_skips_chain_clutter,
@@ -178,6 +201,7 @@ if __name__ == "__main__":
         test_always_kinds_even_when_small, test_build_writes_required_routes,
         test_copy_rules_and_jsonld, test_example_events_are_marked,
         test_kind_pages_use_real_counts, test_index_nav_points_at_new_routes,
+        test_joes_diner_absent_from_site,
     ]
     for fn in tests:
         fn()

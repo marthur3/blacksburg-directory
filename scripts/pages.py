@@ -16,7 +16,7 @@ from collections import Counter
 from urllib.parse import quote
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from groups import GROUPS  # noqa: E402
+from groups import GROUPS, is_excluded  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config.json"
@@ -186,6 +186,10 @@ def load() -> tuple[dict, dict, dict]:
     biz = json.loads(BIZ_PATH.read_text(encoding="utf-8"))
     events = json.loads(EVENTS_PATH.read_text(encoding="utf-8")) if EVENTS_PATH.exists() else {"events": []}
     return cfg, biz, events
+
+
+def without_excluded(cfg: dict, rows: list[dict]) -> list[dict]:
+    return [b for b in rows if not is_excluded(cfg, b)]
 
 
 def rel(depth: int, path: str) -> str:
@@ -1010,7 +1014,14 @@ def sweep_stale(written: set[pathlib.Path]) -> None:
 
 def build() -> list[str]:
     cfg, biz_doc, events_doc = load()
-    businesses = biz_doc.get("businesses") or []
+    businesses = without_excluded(cfg, biz_doc.get("businesses") or [])
+    events_doc = {
+        **events_doc,
+        "events": [
+            ev for ev in (events_doc.get("events") or [])
+            if not is_excluded(cfg, {"id": ev.get("listing_id") or "", "name": ev.get("venue") or ev.get("title") or ""})
+        ],
+    }
     written: set[pathlib.Path] = set()
     kind_pages = collect_kind_pages(businesses)
     group_pages = collect_group_pages(businesses)
