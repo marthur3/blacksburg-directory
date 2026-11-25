@@ -2,7 +2,7 @@
   "title": "Blacksburg Business Directory",
   "site_name": "Blacksburg Connect",
   "site_url": "https://marthur3.github.io/blacksburg-directory",
-  "newsletter_url": "",
+  "newsletter_url": "https://blacksburgconnect.com",
   "event_submit_url": "",
   "bbox": { "west": -80.50, "south": 37.10, "east": -80.34, "north": 37.29 },
   "center": [37.2296, -80.4139],
