@@ -17,6 +17,7 @@ const count = o => Object.keys(o.listings).length + Object.keys(o.rules).length;
 
 function initEdit() {
   lsSet(LS.on, 1);
+  document.body.classList.add("editing"); setCompact(); setTimeout(() => map && map.resize(), 350);
   ed.records = DATA.businesses.map(b => ({ ...b })).concat((DATA.hidden || []).map(h => ({ ...h, hidden: true })));
   ed.records.forEach(r => ed.orig.set(r.id, { ...r }));
   ed.pending = lsGet(LS.pending, emptyEdits());
@@ -32,6 +33,7 @@ function initEdit() {
   $("edbar").addEventListener("click", onBarClick);
   $("edbar").addEventListener("change", onBarChange);
   $("edpanel").addEventListener("click", onPanelClick);
+  $("edpanel").addEventListener("change", onBarChange);
   $("edpanel").addEventListener("submit", onTokenSubmit);
   $("list").addEventListener("change", onEditorChange);
   $("list").addEventListener("click", onEditorClick);
@@ -108,30 +110,24 @@ function effectiveRule(kind) {
 
 /* Bar */
 function drawBar() {
-  const n = count(ed.pending), hiddenN = ed.records.filter(r => r.hidden).length, sug = suggestions().length;
-  const flagged = FLAGS.map(f => [f, ed.records.filter(r => !r.hidden && (r.flag || "").split("; ").includes(f)).length]).filter(x => x[1]);
+  const n = count(ed.pending), sug = suggestions().length;
   $("edbar").innerHTML = `
-    <div class="edrow"><strong>${n ? `${n} unsaved ${n === 1 ? "change" : "changes"}` : "Edit mode"}</strong>
-      <span>${n ? `<button type="button" data-act="save" class="go"${ed.busy ? " disabled" : ""}>${ed.busy ? "Saving" : "Save to directory"}</button>
+    <div class="edrow"><strong>${n ? `${n} unsaved` : ed.saved.length ? "Saved" : "Editing"}</strong>
+      <span>${n ? `<button type="button" data-act="save" class="go"${ed.busy ? " disabled" : ""}>${ed.busy ? "Saving" : "Save"}</button>
       <button type="button" data-act="undo"${ed.log.length ? "" : " disabled"}>Undo</button>` : ""}
-      <button type="button" data-act="patterns">Patterns${sug ? ` (${sug})` : ""}</button>
-      <button type="button" data-act="account">Account</button></span></div>
-    ${ed.toast ? `<div class="edtoast">${ed.toast}</div>` : ""}
-    <div class="edrow sub"><label><input type="checkbox" data-act="hidden"${ed.showHidden ? " checked" : ""}> Show hidden (${hiddenN})</label>
-      <select data-act="flag" aria-label="Filter by flag"><option value="">Any flag</option>${flagged.map(([f, c]) => `<option value="${esc(f)}"${state.flag === f ? " selected" : ""}>${esc(f)} (${c})</option>`).join("")}</select>
-      ${ed.saved.length ? `<span>Saved changes are live here. The public page catches up in a few minutes.</span>` : ""}</div>`;
+      <button type="button" data-act="tools">Tools${sug ? ` (${sug})` : ""}</button></span></div>
+    ${ed.toast ? `<div class="edtoast">${ed.toast}</div>` : ""}`;
 }
 function onBarClick(e) {
   const act = e.target.dataset.act;
   if (act === "save") save();
   if (act === "undo" && ed.log.length) { ed.pending = JSON.parse(ed.log.pop()); ed.toast = null; applyEdits(); }
-  if (act === "patterns") togglePanel("patterns");
-  if (act === "account") togglePanel("account");
+  if (act === "tools") togglePanel("patterns");
   if (e.target.dataset.rule) applyRuleButton(e.target);
 }
 function onBarChange(e) {
   if (e.target.dataset.act === "hidden") { ed.showHidden = e.target.checked; applyEdits(); }
-  if (e.target.dataset.act === "flag") { state.flag = e.target.value; reset(); }
+  if (e.target.dataset.act === "flag") { state.flag = e.target.value; closePanel(); reset(); }
 }
 function applyRuleButton(btn) {
   const kind = btn.dataset.kind;
@@ -211,7 +207,13 @@ function drawPatterns() {
   const sug = suggestions(), cs = closedSignal();
   const moved = ed.records.filter(r => !r.hidden && r.was_group).length, hid = ed.records.filter(r => r.hidden).length;
   const rules = Object.entries({ ...Object.fromEntries((DATA.rules || []).map(r => [r.kind, r])), ...Object.assign({}, ...ed.saved.map(s => s.edits.rules)), ...ed.pending.rules });
-  $("edpanel").innerHTML = `<h2>Patterns in your corrections</h2>
+  const hiddenN = ed.records.filter(r => r.hidden).length;
+  const flagged = FLAGS.map(f => [f, ed.records.filter(r => !r.hidden && (r.flag || "").split("; ").includes(f)).length]).filter(v => v[1]);
+  $("edpanel").innerHTML = `<div class="edrow"><h2>Tools</h2><button type="button" data-act="close">Back to the list</button></div>
+    <div class="edview"><label><input type="checkbox" data-act="hidden"${ed.showHidden ? " checked" : ""}> Show hidden listings (${hiddenN})</label>
+      <select data-act="flag" aria-label="Filter by flag"><option value="">Show any flag</option>${flagged.map(([f, c]) => `<option value="${esc(f)}"${state.flag === f ? " selected" : ""}>Only “${esc(f)}” (${c})</option>`).join("")}</select></div>
+    ${ed.saved.length ? `<p>Your saved changes already show here. The public page catches up in a few minutes.</p>` : ""}
+    <h2>Patterns in your corrections</h2>
     <p>${moved} regrouped, ${hid} hidden so far.</p>
     ${sug.length ? `<ul>${sug.map(s => s.type === "group"
       ? `<li>You moved ${s.n} of ${s.total} “${esc(s.kind)}” listings to ${esc(s.group)}. <button type="button" data-rule="group" data-kind="${esc(s.kind)}" data-group="${esc(s.group)}">Move the other ${s.rest}</button></li>`
@@ -220,7 +222,7 @@ function drawPatterns() {
     ${cs ? `<p>Half of the ${cs.n} listings you hid as closed had source confidence of ${Math.round(cs.median * 100)}% or less. ${cs.below} visible listings sit at or below that. <button type="button" data-act="leastcertain">Review them, least certain first</button></p>`
       : `<p>Hide five closed listings and this panel will show whether low source confidence predicts closures.</p>`}
     ${rules.length ? `<h2>Rules for whole kinds</h2><ul>${rules.map(([k, r]) => `<li>“${esc(k)}” ${r.hide ? "is hidden" : `goes to ${esc(r.group)}`}</li>`).join("")}</ul>` : ""}
-    <button type="button" data-act="close">Close</button>`;
+    <p><button type="button" data-act="account">GitHub token and account</button></p>`;
 }
 function drawAccount(msg) {
   const has = !!lsGet(LS.token);
@@ -232,17 +234,23 @@ function drawAccount(msg) {
     ${msg ? `<p class="msg">${msg}</p>` : ""}
     <p><button type="button" data-act="signout">Leave edit mode on this device</button> <button type="button" data-act="close">Close</button></p>`;
 }
+/* The tools panel takes over the list area while open, so nothing gets squeezed. */
+function closePanel() { $("edpanel").hidden = true; $("panel").classList.remove("paneling"); }
+function openPanel(view) {
+  const p = $("edpanel");
+  p.hidden = false; p.dataset.view = view; $("panel").classList.add("paneling");
+  view === "patterns" ? drawPatterns() : drawAccount();
+}
 function togglePanel(view) {
   const p = $("edpanel");
-  if (!p.hidden && p.dataset.view === view) { p.hidden = true; return; }
-  p.hidden = false; p.dataset.view = view;
-  view === "patterns" ? drawPatterns() : drawAccount();
+  if (!p.hidden && p.dataset.view === view) closePanel(); else openPanel(view);
 }
 function onPanelClick(e) {
   const act = e.target.dataset.act;
   if (e.target.dataset.rule) applyRuleButton(e.target);
-  if (act === "close") $("edpanel").hidden = true;
-  if (act === "leastcertain") { state.sort = "conf"; $("sort").value = "conf"; $("edpanel").hidden = true; reset(); }
+  if (act === "close") closePanel();
+  if (act === "account") openPanel("account");
+  if (act === "leastcertain") { state.sort = "conf"; $("sort").value = "conf"; closePanel(); reset(); }
   if (act === "signout") { [LS.token, LS.on].forEach(k => lsSet(k, null)); location.href = location.pathname; }
 }
 async function onTokenSubmit(e) {
@@ -312,7 +320,7 @@ function mergeCsv(text, edits) {
 
 async function save() {
   const token = lsGet(LS.token);
-  if (!token) { togglePanel("account"); $("edpanel").hidden = false; drawAccount("Store a token first. Your changes stay staged here."); return; }
+  if (!token) { openPanel("account"); drawAccount("Store a token first. Your changes stay staged here."); return; }
   ed.busy = true; drawBar();
   const path = `/repos/${cfg.repo}/contents/overrides.csv`, branch = cfg.branch || "main", n = count(ed.pending);
   try {
@@ -332,7 +340,8 @@ async function save() {
 }
 
 const ED_CSS = `
-  #edbar { padding: 8px 20px; background: #fff7e0; border-bottom: 1px solid #e3cf8f; font-size: 13px; }
+  #panel.paneling > #filters, #panel.paneling > #status, #panel.paneling > #body, #panel.paneling > footer { display: none; }
+  #edbar { padding: 6px 20px; background: #fff7e0; border-bottom: 1px solid #e3cf8f; font-size: 13px; }
   .edrow { display: flex; flex-wrap: wrap; gap: 6px 10px; justify-content: space-between; align-items: center; }
   .edrow.sub { margin-top: 6px; justify-content: flex-start; color: var(--lichen); }
   .edrow.sub label { display: inline-flex; gap: 5px; align-items: center; }
@@ -342,10 +351,13 @@ const ED_CSS = `
   #edbar button:disabled { opacity: .45; cursor: default; }
   #edbar .go, #edpanel .go { background: var(--maroon); border-color: var(--maroon); color: #fff; }
   .edtoast { margin-top: 6px; padding: 6px 8px; background: #fff; border-left: 3px solid var(--maroon); }
-  #edpanel { padding: 12px 20px; max-height: 45%; overflow-y: auto; background: var(--chalk); border-bottom: 1px solid var(--stone); font-size: 14px; }
+  .edrow { flex-wrap: nowrap; } .edrow > span { display: flex; gap: 6px; flex: none; }
+  .edview { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 8px 0 12px; }
+  .edview label { display: inline-flex; gap: 6px; align-items: center; } #edpanel select { font: inherit; font-size: 13px; padding: 5px 6px; }
+  #edpanel { flex: 1; min-height: 0; padding: 12px 20px; overflow-y: auto; background: var(--chalk); border-bottom: 1px solid var(--stone); font-size: 14px; }
   #edpanel h2 { margin: 0 0 6px; font-size: 16px; font-stretch: 78%; }
   #edpanel p, #edpanel ul { margin: 0 0 8px; } #edpanel ul { padding-left: 18px; } #edpanel li { margin-bottom: 6px; }
-  #edpanel input { width: 100%; margin-bottom: 6px; } #edpanel .msg { color: var(--maroon); }
+  #edpanel input[type="password"] { width: 100%; margin-bottom: 6px; } #edpanel .msg { color: var(--maroon); }
   form.ed { display: grid; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--stone); }
   form.ed label { display: grid; grid-template-columns: 48px 1fr; gap: 8px; align-items: center; font-size: 13px; color: var(--lichen); }
   form.ed textarea { resize: vertical; } form.ed select, form.ed input { min-width: 0; width: 100%; }

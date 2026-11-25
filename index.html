@@ -23,7 +23,7 @@
   a { color: var(--maroon); text-underline-offset: 2px; }
 
   /* Index panel */
-  #panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden auto; background: var(--paper); border-right: 1px solid var(--stone); }
+  #panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; background: var(--paper); border-right: 1px solid var(--stone); }
   #masthead { padding: 18px 20px 14px; background: var(--spruce); color: var(--chalk); }
   h1 { margin: 0; font-size: 34px; line-height: .95; font-weight: 800; font-stretch: 68%; letter-spacing: -.005em; }
   #sub { margin: 6px 0 12px; font-size: 13px; color: #b9c8c1; }
@@ -60,7 +60,7 @@
   #status strong { color: var(--spruce); font-weight: 700; font-variant-numeric: tabular-nums; }
   .textbtn { border: 0; background: none; padding: 0; color: var(--maroon); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 
-  #body { flex: 1 0 260px; min-height: 0; overflow: hidden; display: grid; grid-template-columns: 1fr 22px; grid-template-rows: minmax(0, 1fr); }
+  #body { flex: 1; min-height: 0; overflow: hidden; display: grid; grid-template-columns: 1fr 22px; grid-template-rows: minmax(0, 1fr); }
   #list { overflow-y: auto; margin: 0; padding: 0; list-style: none; position: relative; }
   #list li.biz { display: grid; grid-template-columns: 14px 1fr; column-gap: 10px; padding: 10px 12px 10px 20px; border-bottom: 1px solid #e6eae4; cursor: pointer; }
   #list li.biz:hover { background: var(--chalk); }
@@ -97,13 +97,32 @@
   .maplibregl-popup-content b { display: block; font-size: 16px; font-weight: 700; font-stretch: 78%; }
   #toggle { display: none; }
 
+  /* Compact mode: short screens and edit mode. Filters shrink so the list keeps the space. */
+  #optbtn { display: none; }
+  body.compact #masthead { padding: 10px 20px; }
+  body.compact h1 { font-size: 20px; margin-bottom: 8px; }
+  body.compact #sub { display: none; }
+  body.compact #filters { padding-top: 8px; padding-bottom: 6px; }
+  body.compact #groups { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; scrollbar-width: thin; padding-bottom: 4px; position: relative; }
+  body.compact #groups .chip { flex: none; border: 1px solid var(--stone); border-radius: 3px; padding: 4px 10px 4px 8px; }
+  body.compact #groups .chip[aria-pressed="true"] { border-color: var(--spruce); }
+  body.compact #groups .chip .n { margin-left: 0; }
+  body.compact #cats { margin-top: 4px; padding-top: 6px; }
+  body.compact #opts { display: none; }
+  body.compact.optsopen #opts { display: flex; margin-top: 6px; }
+  body.compact #optbtn { display: inline; }
+  body.compact #status { padding-top: 6px; padding-bottom: 6px; }
+  body.compact footer { display: none; }
+  #maplost { position: absolute; inset: auto 0 0 0; z-index: 2; padding: 8px 12px; font-size: 13px; background: var(--spruce); color: var(--chalk); }
+  #maplost button { margin-left: 8px; }
+
   body.embed #masthead h1, body.embed #sub, body.embed footer { display: none; }
   body.embed #masthead { padding: 10px 20px; }
 
   @media (max-width: 820px) {
-    body { grid-template-columns: 1fr; grid-template-rows: 44% 56%; transition: grid-template-rows .25s ease; }
+    body { grid-template-columns: 1fr; grid-template-rows: 38% 62%; transition: grid-template-rows .25s ease; }
+    body.editing { grid-template-rows: 28% 72%; }
     body.listfull { grid-template-rows: 0% 100%; }
-    body.mapfull { grid-template-rows: calc(100% - 118px) 118px; }
     #mapwrap { grid-row: 1; }
     #panel { grid-row: 2; border-right: 0; border-top: 1px solid var(--stone); }
     #masthead { padding: 10px 14px; display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
@@ -140,14 +159,14 @@
       <label id="newwrap" hidden><input type="checkbox" id="newonly"> New listings</label>
     </div>
   </div>
-  <div id="status"><span id="n"></span><span><button id="clear" class="textbtn" type="button" hidden>Clear filters</button> <button id="share" class="textbtn" type="button">Copy link to this view</button></span></div>
+  <div id="status"><span id="n"></span><span><button id="optbtn" class="textbtn" type="button" aria-expanded="false">Filters</button> <button id="clear" class="textbtn" type="button" hidden>Clear</button> <button id="share" class="textbtn" type="button">Copy link</button></span></div>
   <div id="body">
     <ul id="list"></ul>
     <nav id="rail" aria-label="Jump to letter"></nav>
   </div>
   <footer id="foot"></footer>
 </section>
-<div id="mapwrap"><div id="map"></div></div>
+<div id="mapwrap"><div id="map"></div><div id="maplost" hidden>The map stopped drawing. <button type="button" class="textbtn" style="color:inherit" onclick="rebuildMap()">Reload map</button></div></div>
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
@@ -240,7 +259,20 @@ function writeUrl() {
   try { history.replaceState(null, "", s ? "?" + s : location.pathname); } catch {}
 }
 
+function setCompact() {
+  const b = document.body;
+  b.classList.toggle("compact", innerWidth <= 820 || innerHeight < 900 || b.classList.contains("editing"));
+}
 function wire() {
+  setCompact(); addEventListener("resize", setCompact);
+  $("optbtn").addEventListener("click", () => {
+    const open = document.body.classList.toggle("optsopen");
+    $("optbtn").setAttribute("aria-expanded", String(open)); $("optbtn").textContent = open ? "Fewer filters" : "Filters";
+  });
+  // A mouse wheel has no sideways axis, so map it onto the chip rows.
+  for (const id of ["groups", "cats"]) $(id).addEventListener("wheel", e => {
+    if (e.deltaY && !e.deltaX && $(id).scrollWidth > $(id).clientWidth) { $(id).scrollLeft += e.deltaY; e.preventDefault(); }
+  }, { passive: false });
   $("q").addEventListener("input", e => { state.q = e.target.value.trim(); reset(); });
   $("town").addEventListener("change", e => { state.t = e.target.value; reset(); });
   $("sort").addEventListener("change", e => { state.sort = e.target.value; reset(); });
@@ -249,11 +281,11 @@ function wire() {
   $("groups").addEventListener("click", e => { const c = e.target.closest(".chip"); if (c) { state.g = c.dataset.v; state.c = ""; reset(); } });
   $("cats").addEventListener("click", e => { const c = e.target.closest(".chip"); if (c) { state.c = state.c === c.dataset.v ? "" : c.dataset.v; reset(); } });
   $("clear").addEventListener("click", clearAll);
-  $("share").addEventListener("click", () => copy(location.href, $("share"), "Copy link to this view"));
+  $("share").addEventListener("click", () => copy(location.href, $("share"), "Copy link"));
   $("toggle").addEventListener("click", () => {
     const full = document.body.classList.toggle("listfull");
     $("toggle").textContent = full ? "Show map" : "Bigger list";
-    setTimeout(() => map && map.resize(), 300);
+    setTimeout(() => { if (map && !full) { mapIsLost() ? rebuildMap() : map.resize(); } }, 320);
   });
   $("list").addEventListener("click", onListClick);
   $("rail").addEventListener("click", e => { if (e.target.dataset.l) jump(e.target.dataset.l); });
@@ -308,6 +340,8 @@ function drawChips() {
   $("groups").innerHTML = `<button class="chip" data-v="" aria-pressed="${!state.g}">Everything <span class="n">${pool.length.toLocaleString()}</span></button>` +
     groups.filter(g => gc[g] || g === state.g).map(g =>
       `<button class="chip" data-v="${esc(g)}" aria-pressed="${g === state.g}"><span class="sw" style="background:${color(g)}"></span>${esc(g)} <span class="n">${gc[g] || 0}</span></button>`).join("");
+  const on = $("groups").querySelector('[aria-pressed="true"]');
+  if (on && $("groups").scrollWidth > $("groups").clientWidth) $("groups").scrollLeft = Math.max(0, on.offsetLeft - 40);
   if (!state.g) { $("cats").innerHTML = ""; return; }
   const cc = {};
   filterAll("c").forEach(b => { if (b.category) cc[b.category] = (cc[b.category] || 0) + 1; });
@@ -414,7 +448,12 @@ async function initMap() {
     const r = await fetch(BASEMAP, { signal: AbortSignal.timeout(6000) });
     if (r.ok) { style = await r.json(); hasLabels = true; }
   } catch {}
-  map = new maplibregl.Map({ container: "map", style, center: [cfg.center[1], cfg.center[0]], zoom: cfg.zoom, attributionControl: { compact: true } });
+  // pixelRatio is capped because a 3x phone canvas is the usual cause of a lost WebGL context.
+  map = new maplibregl.Map({ container: "map", style, center: mapView?.center || [cfg.center[1], cfg.center[0]], zoom: mapView?.zoom ?? cfg.zoom,
+    pixelRatio: Math.min(devicePixelRatio || 1, 2), attributionControl: { compact: true } });
+  const canvas = map.getCanvas();
+  canvas.addEventListener("webglcontextlost", () => { clearTimeout(lostTimer); lostTimer = setTimeout(rebuildMap, 1500); });
+  canvas.addEventListener("webglcontextrestored", () => clearTimeout(lostTimer));
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
   map.addControl(new maplibregl.GeolocateControl({ trackUserLocation: false }), "top-right");
   popup = new maplibregl.Popup({ closeButton: false, offset: 12, maxWidth: "240px" });
@@ -448,8 +487,33 @@ async function initMap() {
 }
 
 function drawMap() {
-  map?.getSource("biz")?.setData({ type: "FeatureCollection", features: shown.map(point) });
+  const src = map?.getSource("biz"); if (!src) return;
+  // Skip the re-cluster when an edit changed nothing the map shows.
+  const sig = shown.map(b => b.id + b.group).join("|");
+  if (sig === mapSig) return;
+  mapSig = sig;
+  src.setData({ type: "FeatureCollection", features: shown.map(point) });
 }
+
+/* Phones drop the WebGL context when the tab is backgrounded or memory runs short, and often
+   never restore it. Rebuild the map in place, keeping the view. */
+let mapView = null, mapSig = "", lostTimer = 0, rebuilding = false;
+function mapIsLost() { try { return !map || map.painter.context.gl.isContextLost(); } catch { return true; } }
+async function rebuildMap() {
+  if (rebuilding || !window.maplibregl) return;
+  rebuilding = true; clearTimeout(lostTimer);
+  try {
+    if (map) { try { mapView = { center: map.getCenter().toArray(), zoom: map.getZoom() }; } catch {} try { map.remove(); } catch {} }
+    map = null; mapSig = ""; $("map").innerHTML = "";
+    await Promise.race([initMap(), new Promise((_, no) => setTimeout(() => no(new Error("timeout")), 15000))]);
+    drawMap();
+    const b = byId.get(state.id);
+    if (b) { map.getSource("sel")?.setData(point(b)); }
+    $("maplost").hidden = true;
+  } catch { $("maplost").hidden = false; }
+  rebuilding = false;
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden && map && mapIsLost()) rebuildMap(); });
 
 load().catch(err => {
   const hint = location.protocol === "file:" ? " Serve this folder with <code>python -m http.server 8000</code> and open http://localhost:8000." : "";
