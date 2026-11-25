@@ -1,0 +1,69 @@
+{
+  "readme": "Manual event list for the /events calendar. Add a row, then run python scripts/pages.py. Set example to true for sample listings that are not real events.",
+  "events": [
+    {
+      "id": "example-saturday-market",
+      "slug": "example-saturday-market",
+      "title": "Example: Saturday market on Roanoke Street",
+      "example": true,
+      "category": "Food",
+      "start": "2026-11-28T09:00:00-05:00",
+      "end": "2026-11-28T14:00:00-05:00",
+      "venue": "Blacksburg Farmers Market",
+      "listing_id": "f49520a5-56f7-4af5-81d0-0e57767c744d",
+      "address": "108 W Roanoke St",
+      "town": "Blacksburg",
+      "description": "Sample listing so you can see how the calendar works. It is not a real event. Replace this row in events.json with an actual market date.",
+      "url": "",
+      "organizer": ""
+    },
+    {
+      "id": "example-lyric-evening",
+      "slug": "example-lyric-evening",
+      "title": "Example: An evening at the Lyric",
+      "example": true,
+      "category": "Arts",
+      "start": "2026-12-03T19:00:00-05:00",
+      "end": "2026-12-03T21:30:00-05:00",
+      "venue": "Lyric Theatre",
+      "listing_id": "291b2e0b-eccb-4d95-a4fa-9b94635ee278",
+      "address": "135 College Ave",
+      "town": "Blacksburg",
+      "description": "Sample listing so you can see an Arts event page. It is not a real showing. Replace this row in events.json.",
+      "url": "",
+      "organizer": ""
+    },
+    {
+      "id": "example-henderson-lawn",
+      "slug": "example-henderson-lawn",
+      "title": "Example: Lunchtime on Henderson Lawn",
+      "example": true,
+      "category": "Campus",
+      "start": "2026-12-10T12:00:00-05:00",
+      "end": "2026-12-10T13:00:00-05:00",
+      "venue": "Henderson Lawn",
+      "listing_id": "17cbb8a7-4c9a-4ab2-b22c-bcc1a778ed4c",
+      "address": "100-138 College Ave",
+      "town": "Blacksburg",
+      "description": "Sample listing so you can see a campus event. It is not a real gathering. Replace this row in events.json.",
+      "url": "",
+      "organizer": ""
+    },
+    {
+      "id": "example-montgomery-museum",
+      "slug": "example-montgomery-museum",
+      "title": "Example: An hour at the Montgomery Museum",
+      "example": true,
+      "category": "Arts",
+      "start": "2026-12-15T17:00:00-05:00",
+      "end": "2026-12-15T18:30:00-05:00",
+      "venue": "Montgomery Museum of Art & History",
+      "listing_id": "79defcd4-a183-461d-a29d-9a911f8dd03d",
+      "address": "4 E Main St",
+      "town": "Christiansburg",
+      "description": "Sample listing so you can see a Christiansburg event page. It is not a real program. Replace this row in events.json.",
+      "url": "",
+      "organizer": ""
+    }
+  ]
+}
