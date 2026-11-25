@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://marthur3.github.io/blacksburg-directory/sitemap.xml

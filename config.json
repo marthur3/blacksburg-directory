@@ -1,5 +1,11 @@
 {
   "title": "Blacksburg Business Directory",
+  "site_name": "Blacksburg Connect",
+  "site_url": "https://marthur3.github.io/blacksburg-directory",
+  "newsletter_url": "https://blacksburgconnect.com",
+  "event_submit_url": "",
+  "exclude_ids": ["503dc8cb-13f9-4b0a-a2ed-65e8d9e7aefe"],
+  "exclude_names": ["Joe's Diner"],
   "bbox": { "west": -80.50, "south": 37.10, "east": -80.34, "north": 37.29 },
   "center": [37.2296, -80.4139],
   "zoom": 13,

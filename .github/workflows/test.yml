@@ -15,4 +15,11 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt
       - run: python tests/test_pipeline.py
+      - run: python tests/test_pages.py
       - run: node tests/test_edit_merge.js
+      - run: node tests/test_events_tz.js
+      - name: Generated pages stay in sync
+        run: |
+          python scripts/pages.py
+          git add -A best blacksburg christiansburg events newsletter sitemap.xml robots.txt 404.html
+          git diff --cached --exit-code -- best blacksburg christiansburg events newsletter sitemap.xml robots.txt 404.html

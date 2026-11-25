@@ -7,8 +7,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from groups import GROUPS, assign_group  # noqa: E402
-from refresh import apply_overrides, latest_release, pull, to_record  # noqa: E402
+from groups import GROUPS, assign_group, is_excluded  # noqa: E402
+from refresh import apply_overrides, drop_excluded, latest_release, pull, to_record  # noqa: E402
 
 CONFIG = json.loads((ROOT / "config.json").read_text())
 
@@ -174,9 +174,21 @@ def test_latest_release_url():
     assert "retrying" in body
 
 
+def test_exclude_joes_diner():
+    rec = {"id": "503dc8cb-13f9-4b0a-a2ed-65e8d9e7aefe", "name": "Joe's Diner"}
+    assert is_excluded(CONFIG, rec)
+    assert is_excluded(CONFIG, {"id": "other", "name": "Joe’s Diner"})  # curly apostrophe
+    records = {rec["id"]: rec, "keep": {"id": "keep", "name": "Stay"}}
+    hidden = drop_excluded(records, [dict(rec)], CONFIG)
+    assert rec["id"] not in records
+    assert "keep" in records
+    assert hidden == []
+
+
 if __name__ == "__main__":
     tests = [test_groups, test_fixture_pull, test_overrides_add_and_hide, test_kind_rules_flags_and_history,
-             test_existing_overrides_still_hide, test_drop_landmarks, test_latest_release_url]
+             test_existing_overrides_still_hide, test_drop_landmarks, test_latest_release_url,
+             test_exclude_joes_diner]
     for fn in tests:
         fn()
         print("ok", fn.__name__)

@@ -23,10 +23,11 @@ jobs:
           python-version: "3.12"
       - run: pip install duckdb
       - run: python scripts/refresh.py
+      - run: python scripts/pages.py
       - name: Commit data
         run: |
           git config user.name "directory-bot"
           git config user.email "directory-bot@users.noreply.github.com"
-          git add data/
+          git add data/ best/ blacksburg/ christiansburg/ events/ newsletter/ sitemap.xml robots.txt 404.html
           git diff --cached --quiet || git commit -m "Refresh directory data"
           git push
